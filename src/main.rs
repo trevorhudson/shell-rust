@@ -23,7 +23,8 @@ fn main() {
             let mut found = false;
 
             for path in env::split_paths(&env::var("PATH").unwrap()) {
-                if path.join(argument).is_executable() {
+                let path = path.join(argument);
+                if path.is_executable() {
                     println!("{} is {:?}", argument, path);
                     found = true;
                     break;
