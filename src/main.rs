@@ -11,11 +11,16 @@ fn main() {
 
         if command == "exit" {
             break;
-        } else if command.starts_with("echo ") {
-            let arguments = &command[5..];
+        } else if let Some(argument) = command.strip_prefix("type ") {
+            if argument == "echo" || argument == "exit" || argument == "type" {
+                println!("{} is a shell builtin", argument)
+            } else {
+                println!("{}: command not found", argument);
+            }
+        } else if let Some(arguments) = command.strip_prefix("echo ") {
             println!("{}", arguments);
         } else {
-        println!("{}: command not found", command);
+            println!("{}: command not found", command);
         }
     }
 }
