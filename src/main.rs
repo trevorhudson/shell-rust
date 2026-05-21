@@ -25,7 +25,7 @@ fn main() {
             for path in env::split_paths(&env::var("PATH").unwrap()) {
                 let path = path.join(argument);
                 if path.is_executable() {
-                    println!("{} is {:?}", argument, path);
+                    println!("{} is {}", argument, path.display());
                     found = true;
                     break;
                 }
