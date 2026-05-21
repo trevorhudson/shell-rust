@@ -7,13 +7,15 @@ fn main() {
         print!("$ ");
         io::stdout().flush().unwrap();
         io::stdin().read_line(&mut command).unwrap();
-
         command = command.trim().to_string();
 
         if command == "exit" {
             break;
-        }
-
+        } else if command.starts_with("echo ") {
+            let arguments = &command[5..];
+            println!("{}", arguments);
+        } else {
         println!("{}: command not found", command);
+        }
     }
 }
