@@ -20,14 +20,19 @@ fn main() {
                 continue;
             }
 
-            for path in env::split_paths(&env!("PATH")) {
-                if path.is_executable() {
+            let mut found = false;
+
+            for path in env::split_paths(&env::var("PATH").unwrap()) {
+                if path.join(argument).is_executable() {
                     println!("{} is {:?}", argument, path);
-                    continue;
+                    found = true;
+                    break;
                 }
             }
+            if !found {
+                println!("{}: not found", argument);
+            }
 
-            println!("{}: not found", argument);
 
         } else if let Some(arguments) = command.strip_prefix("echo ") {
             println!("{}", arguments);
