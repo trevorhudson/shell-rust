@@ -15,7 +15,7 @@ fn main() {
             if argument == "echo" || argument == "exit" || argument == "type" {
                 println!("{} is a shell builtin", argument)
             } else {
-                println!("{}: command not found", argument);
+                println!("{}: not found", argument);
             }
         } else if let Some(arguments) = command.strip_prefix("echo ") {
             println!("{}", arguments);
