@@ -17,16 +17,17 @@ fn main() -> Result<(), anyhow::Error> {
 
         let trimmed = command.trim();
         let mut iter = trimmed.split_ascii_whitespace();
+
         let Some(program) = iter.next() else {
             continue;
         };
 
+        let args: Vec<&str> = iter.collect();
+
         if program == "exit" {
             break;
-        }
-
-        if program == "type" {
-            let Some(target) = iter.next() else {
+        } else if program == "type" {
+            let Some(target) = args.first() else {
                 continue;
             };
             if is_builtin(target) {
@@ -36,17 +37,11 @@ fn main() -> Result<(), anyhow::Error> {
             } else {
                 println!("{}: not found", target);
             }
-            continue;
+        } else if program == "echo" {
+            println!("{}", args.join(" "));
+        } else {
+            println!("{}: command not found", program);
         }
-
-        // match locate_executable(program) {
-        //     Some(path) => {
-        //         let mut c = Command::new(path);
-        //         c.args(iter);
-        //         c.status()?;
-        //     }
-        //     None => println!("{}: command not found", trimmed),
-        // }
     }
     Ok(())
 }
@@ -67,3 +62,12 @@ fn locate_executable(argument: &str) -> Option<PathBuf> {
         None => None,
     }
 }
+
+// match locate_executable(program) {
+//     Some(path) => {
+//         let mut c = Command::new(path);
+//         c.args(iter);
+//         c.status()?;
+//     }
+//     None => println!("{}: command not found", trimmed),
+// }
