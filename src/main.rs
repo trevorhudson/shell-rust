@@ -12,6 +12,8 @@ fn main() -> Result<(), anyhow::Error> {
         io::stdin().read_line(&mut command)?;
 
         let trimmed = command.trim();
+        // Note: this will not perform great under all conditions.
+        // will need to be expanded to handle more complex interpolation
         let mut iter = trimmed.split_ascii_whitespace();
 
         let Some(program) = iter.next() else {
@@ -36,6 +38,9 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             } else if program == "echo" {
                 println!("{}", args.join(" "));
+            } else if program == "pwd" {
+                let path = env::current_dir()?;
+                println!("{}", path.display());
             }
         } else {
             match locate_executable(program) {
@@ -52,7 +57,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 fn is_builtin(target: &str) -> bool {
-    target == "exit" || target == "type" || target == "echo"
+    target == "exit" || target == "type" || target == "echo" || target == "pwd"
 }
 
 fn locate_executable(argument: &str) -> Option<PathBuf> {
