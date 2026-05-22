@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{env, os::unix::process::CommandExt, path::PathBuf, process::Command};
+use std::{env, path::PathBuf};
 
 use is_executable::IsExecutable;
 
@@ -15,7 +15,8 @@ fn main() -> Result<(), anyhow::Error> {
         io::stdout().flush()?;
         io::stdin().read_line(&mut command)?;
 
-        let mut iter = command.trim().split_ascii_whitespace();
+        let trimmed = command.trim();
+        let mut iter = trimmed.split_ascii_whitespace();
         let Some(program) = iter.next() else {
             continue;
         };
@@ -24,17 +25,34 @@ fn main() -> Result<(), anyhow::Error> {
             break;
         }
 
-        match locate_executable(program) {
-            Some(path) => {
-                let mut c = Command::new(path);
-                println!("{:?}", c.get_program());
-                c.args(iter);
-                c.status()?;
+        if program == "type" {
+            let Some(target) = iter.next() else {
+                continue;
+            };
+            if is_builtin(target) {
+                println!("{} is a shell builtin", target);
+            } else if let Some(path) = locate_executable(target) {
+                println!("{} is {}", target, path.display());
+            } else {
+                println!("{}: not found", target);
             }
-            None => println!("{}: command not found", command),
+            continue;
         }
+
+        // match locate_executable(program) {
+        //     Some(path) => {
+        //         let mut c = Command::new(path);
+        //         c.args(iter);
+        //         c.status()?;
+        //     }
+        //     None => println!("{}: command not found", trimmed),
+        // }
     }
     Ok(())
+}
+
+fn is_builtin(target: &str) -> bool {
+    target == "exit" || target == "type" || target == "echo"
 }
 
 fn locate_executable(argument: &str) -> Option<PathBuf> {
