@@ -1,12 +1,12 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{env, path::PathBuf};
+use std::{env, path::{self, PathBuf}, process::Command};
 
 use is_executable::IsExecutable;
 
-// Now let's refactor to make this actually functional!
-// implement better control flow for commands
-//
+// Refactor:
+// If program is NOT a built in. We should execute the actual program.
+
 fn main() -> Result<(), anyhow::Error> {
     loop {
         let mut command = String::new();
@@ -24,23 +24,36 @@ fn main() -> Result<(), anyhow::Error> {
 
         let args: Vec<&str> = iter.collect();
 
-        if program == "exit" {
-            break;
-        } else if program == "type" {
-            let Some(target) = args.first() else {
-                continue;
-            };
-            if is_builtin(target) {
-                println!("{} is a shell builtin", target);
-            } else if let Some(path) = locate_executable(target) {
-                println!("{} is {}", target, path.display());
-            } else {
-                println!("{}: not found", target);
+        // otherwise, follow other logic.
+        // if unavailable, command not found.
+
+        if is_builtin(program) {
+            if program == "exit" {
+                break;
+            } else if program == "type" {
+                let Some(target) = args.first() else {
+                    continue;
+                };
+                if is_builtin(target) {
+                    println!("{} is a shell builtin", target);
+                } else if let Some(path) = locate_executable(target) {
+                    println!("{} is {}", target, path.display());
+                } else {
+                    println!("{}: not found", target);
+                }
+            } else if program == "echo" {
+                println!("{}", args.join(" "));
             }
-        } else if program == "echo" {
-            println!("{}", args.join(" "));
-        } else {
-            println!("{}: command not found", program);
+        }
+        else {
+            match locate_executable(program) {
+                Some(path) => {
+                    let mut c = Command::new(program);
+                    c.args(args);
+                    c.status()?;
+                }
+                None => println!("{}: command not found", trimmed),
+            }
         }
     }
     Ok(())
@@ -54,6 +67,8 @@ fn locate_executable(argument: &str) -> Option<PathBuf> {
     match env::var_os("PATH") {
         Some(paths) => {
             // find first executable path
+            // [tester::#IP1] Received: "PATHS: "/tmp/cow:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin""
+            // println!("PATHS: {:?}", paths);
             env::split_paths(&paths).find_map(|p| {
                 let joined = p.join(argument);
                 joined.is_executable().then_some(joined)
@@ -62,12 +77,3 @@ fn locate_executable(argument: &str) -> Option<PathBuf> {
         None => None,
     }
 }
-
-// match locate_executable(program) {
-//     Some(path) => {
-//         let mut c = Command::new(path);
-//         c.args(iter);
-//         c.status()?;
-//     }
-//     None => println!("{}: command not found", trimmed),
-// }
