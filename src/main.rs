@@ -1,8 +1,10 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{env};
+use std::{env, path::PathBuf};
 
 use is_executable::IsExecutable;
+
+// Now let's refactor to make this actually functional!
 
 fn main() {
     loop {
@@ -20,25 +22,33 @@ fn main() {
                 continue;
             }
 
-            let mut found = false;
-
-            for path in env::split_paths(&env::var("PATH").unwrap()) {
-                let path = path.join(argument);
-                if path.is_executable() {
-                    println!("{} is {}", argument, path.display());
-                    found = true;
-                    break;
+            match locate_executable(argument) {
+                None => println!("{}: not found", argument),
+                Some(val) => {
+                    println!("{}: found", val.display());
+                    if let Some(arguments) = command.strip_suffix(argument) {
+                        println!("{}: found", arguments)
+                    }
+                    // let new_command = Command::new(val).args(args)
                 }
-            }
-            if !found {
-                println!("{}: not found", argument);
-            }
-
-
+            };
         } else if let Some(arguments) = command.strip_prefix("echo ") {
             println!("{}", arguments);
         } else {
             println!("{}: command not found", command);
         }
+    }
+}
+
+fn locate_executable(argument: &str) -> Option<PathBuf> {
+    match env::var_os("PATH") {
+        Some(paths) => {
+            // find first executable path
+            env::split_paths(&paths).find_map(|p| {
+                let joined = p.join(argument);
+                joined.is_executable().then_some(joined)
+            })
+        }
+        None => None,
     }
 }
