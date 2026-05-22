@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::path::Path;
 use std::{env, path::PathBuf, process::Command};
 
 use is_executable::IsExecutable;
@@ -41,6 +42,22 @@ fn main() -> Result<(), anyhow::Error> {
             } else if program == "pwd" {
                 let path = env::current_dir()?;
                 println!("{}", path.display());
+            } else if program == "cd" {
+                let Some(path) = args.first() else {
+                    continue;
+                };
+
+                let directory = Path::new(path);
+
+                if directory.exists() {
+                    env::set_current_dir(directory)?
+                } else {
+                    println!("cd: {}: No such file or directory", directory.display())
+                }
+
+                //if dir exists -> change to dir
+                //if does not -> print cd: <directory>: No such file or directory
+                //
             }
         } else {
             match locate_executable(program) {
@@ -57,7 +74,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 fn is_builtin(target: &str) -> bool {
-    target == "exit" || target == "type" || target == "echo" || target == "pwd"
+    target == "exit" || target == "type" || target == "echo" || target == "pwd" || target == "cd"
 }
 
 fn locate_executable(argument: &str) -> Option<PathBuf> {
