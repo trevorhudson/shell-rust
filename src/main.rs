@@ -1,11 +1,7 @@
-#[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{env, path::{self, PathBuf}, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 use is_executable::IsExecutable;
-
-// Refactor:
-// If program is NOT a built in. We should execute the actual program.
 
 fn main() -> Result<(), anyhow::Error> {
     loop {
@@ -24,9 +20,6 @@ fn main() -> Result<(), anyhow::Error> {
 
         let args: Vec<&str> = iter.collect();
 
-        // otherwise, follow other logic.
-        // if unavailable, command not found.
-
         if is_builtin(program) {
             if program == "exit" {
                 break;
@@ -44,10 +37,9 @@ fn main() -> Result<(), anyhow::Error> {
             } else if program == "echo" {
                 println!("{}", args.join(" "));
             }
-        }
-        else {
+        } else {
             match locate_executable(program) {
-                Some(path) => {
+                Some(_path) => {
                     let mut c = Command::new(program);
                     c.args(args);
                     c.status()?;
@@ -65,15 +57,10 @@ fn is_builtin(target: &str) -> bool {
 
 fn locate_executable(argument: &str) -> Option<PathBuf> {
     match env::var_os("PATH") {
-        Some(paths) => {
-            // find first executable path
-            // [tester::#IP1] Received: "PATHS: "/tmp/cow:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin""
-            // println!("PATHS: {:?}", paths);
-            env::split_paths(&paths).find_map(|p| {
-                let joined = p.join(argument);
-                joined.is_executable().then_some(joined)
-            })
-        }
+        Some(paths) => env::split_paths(&paths).find_map(|p| {
+            let joined = p.join(argument);
+            joined.is_executable().then_some(joined)
+        }),
         None => None,
     }
 }
