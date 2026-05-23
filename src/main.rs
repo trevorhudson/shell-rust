@@ -82,7 +82,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 fn is_builtin(target: &str) -> bool {
-    target == "exit" || target == "type" || target == "echo" || target == "pwd" || target == "cd"
+    matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
 }
 
 fn locate_executable(argument: &str) -> Option<PathBuf> {
