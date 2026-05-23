@@ -1,18 +1,20 @@
-use std::io::{self, Write};
-use std::path::Path;
-use std::{env, path::PathBuf, process::Command};
+use std::{env, process::Command};
 
-use is_executable::IsExecutable;
+use std::{
+    io::{self, Write},
+    os::unix::{fs::PermissionsExt, process::CommandExt},
+    path::{PathBuf, Path},
+};
 
 fn main() -> Result<(), anyhow::Error> {
     loop {
-        let mut command = String::new();
-
         print!("$ ");
         io::stdout().flush()?;
-        io::stdin().read_line(&mut command)?;
 
-        let trimmed = command.trim();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        let trimmed = input.trim();
         // Note: this will not perform great under all conditions.
         // will need to be expanded to handle more complex interpolation
         let mut iter = trimmed.split_ascii_whitespace();
@@ -48,7 +50,7 @@ fn main() -> Result<(), anyhow::Error> {
                 };
 
                 // Handle HOME
-                if *path == "~".to_string() {
+                if *path == "~" {
                     let Some(home_dir) = env::home_dir() else {
                         println!("cd: {}: Home directory not set", path);
                         continue;
@@ -85,12 +87,14 @@ fn is_builtin(target: &str) -> bool {
     matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
 }
 
-fn locate_executable(argument: &str) -> Option<PathBuf> {
-    match env::var_os("PATH") {
-        Some(paths) => env::split_paths(&paths).find_map(|p| {
-            let joined = p.join(argument);
-            joined.is_executable().then_some(joined)
-        }),
-        None => None,
-    }
+fn locate_executable(command: &str) -> Option<PathBuf> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    std::env::split_paths(&path).find_map(|dir| {
+        let p = dir.join(command);
+        (p.is_file()
+            && p.metadata()
+                .map(|m| m.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false))
+        .then_some(p)
+    })
 }
