@@ -1,12 +1,44 @@
-use std::{env, process::Command};
-
 use std::{
+    env,
     io::{self, Write},
     os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::{PathBuf, Path},
+    path::PathBuf,
 };
 
-fn main() -> Result<(), anyhow::Error> {
+enum Command {
+    Exit,
+    Pwd,
+    Echo { output: String },
+    Type { target: String },
+    Cd { path: String },
+    External { name: String, args: Vec<String> },
+}
+
+impl Command {
+    fn parse(input: &str) -> Option<Self> {
+        let mut parts = input.split_whitespace();
+        let cmd = parts.next()?;
+        Some(match cmd {
+            "exit" => Command::Exit,
+            "pwd" => Command::Pwd,
+            "echo" => Command::Echo {
+                output: { parts.collect::<Vec<_>>().join(" ") },
+            },
+            "cd" => Command::Cd {
+                path: parts.collect::<Vec<_>>().join(" "),
+            },
+            "type" => Command::Type {
+                target: parts.collect::<Vec<_>>().join(" "),
+            },
+            _ => Command::External {
+                name: cmd.to_string(),
+                args: parts.map(str::to_string).collect(),
+            },
+        })
+    }
+}
+
+fn main() -> anyhow::Result<()> {
     loop {
         print!("$ ");
         io::stdout().flush()?;
@@ -14,70 +46,42 @@ fn main() -> Result<(), anyhow::Error> {
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
 
-        let trimmed = input.trim();
-        // Note: this will not perform great under all conditions.
-        // will need to be expanded to handle more complex interpolation
-        let mut iter = trimmed.split_ascii_whitespace();
-
-        let Some(program) = iter.next() else {
+        let Some(command) = Command::parse(input.trim()) else {
             continue;
         };
 
-        let args: Vec<&str> = iter.collect();
-
-        if is_builtin(program) {
-            if program == "exit" {
-                break;
-            } else if program == "type" {
-                let Some(target) = args.first() else {
-                    continue;
-                };
-                if is_builtin(target) {
-                    println!("{} is a shell builtin", target);
-                } else if let Some(path) = locate_executable(target) {
+        match command {
+            Command::Exit => break,
+            Command::Pwd => {
+                println!("{}", env::current_dir()?.display());
+            }
+            Command::Echo { output } => {
+                println!("{}", output)
+            }
+            Command::Type { target } => {
+                if is_builtin(&target) {
+                    println!("{} is a shell builtin", target)
+                } else if let Some(path) = locate_executable(&target) {
                     println!("{} is {}", target, path.display());
                 } else {
-                    println!("{}: not found", target);
-                }
-            } else if program == "echo" {
-                println!("{}", args.join(" "));
-            } else if program == "pwd" {
-                let path = env::current_dir()?;
-                println!("{}", path.display());
-            } else if program == "cd" {
-                let Some(path) = args.first() else {
-                    continue;
-                };
-
-                // Handle HOME
-                if *path == "~" {
-                    let Some(home_dir) = env::home_dir() else {
-                        println!("cd: {}: Home directory not set", path);
-                        continue;
-                    };
-
-                    let home_str = home_dir.as_path();
-                    let directory = Path::new(home_str);
-                    env::set_current_dir(directory)?
-                } else {
-                    let directory = Path::new(path);
-
-                    if directory.exists() {
-                        env::set_current_dir(directory)?
-                    } else {
-                        println!("cd: {}: No such file or directory", directory.display())
-                    }
+                    eprintln!("{}: not found", target);
                 }
             }
-        } else {
-            match locate_executable(program) {
-                Some(_path) => {
-                    let mut c = Command::new(program);
-                    c.args(args);
-                    c.status()?;
+            Command::Cd { path } => {
+                let path = path.replace("~", &std::env::var("HOME").unwrap_or_default());
+                if std::env::set_current_dir(&path).is_err() {
+                    eprintln!("cd: {path}: No such file or directory");
                 }
-                None => println!("{}: command not found", trimmed),
             }
+            Command::External { name, args } => match locate_executable(&name) {
+                Some(path) => {
+                    std::process::Command::new(path)
+                        .arg0(name)
+                        .args(args)
+                        .status()?;
+                }
+                None => eprintln!("{}: command not found", name),
+            },
         }
     }
     Ok(())
