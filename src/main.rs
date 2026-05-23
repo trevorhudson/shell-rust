@@ -47,17 +47,25 @@ fn main() -> Result<(), anyhow::Error> {
                     continue;
                 };
 
-                let directory = Path::new(path);
+                // Handle HOME
+                if *path == "~".to_string() {
+                    let Some(home_dir) = env::home_dir() else {
+                        println!("cd: {}: Home directory not set", path);
+                        continue;
+                    };
 
-                if directory.exists() {
+                    let home_str = home_dir.as_path();
+                    let directory = Path::new(home_str);
                     env::set_current_dir(directory)?
                 } else {
-                    println!("cd: {}: No such file or directory", directory.display())
-                }
+                    let directory = Path::new(path);
 
-                //if dir exists -> change to dir
-                //if does not -> print cd: <directory>: No such file or directory
-                //
+                    if directory.exists() {
+                        env::set_current_dir(directory)?
+                    } else {
+                        println!("cd: {}: No such file or directory", directory.display())
+                    }
+                }
             }
         } else {
             match locate_executable(program) {
