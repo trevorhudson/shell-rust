@@ -1,8 +1,5 @@
 use std::{
-    env,
-    io::{self, Write},
-    os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::PathBuf,
+    env, fs, io::{self, Write}, os::unix::{fs::PermissionsExt, process::CommandExt}, path::{self, PathBuf}
 };
 
 enum Command {
@@ -72,10 +69,15 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
+
         match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
-                println!("{}", env::current_dir()?.display());
+                let output = format!("{}", env::current_dir()?.display());
+                match &parsed.redirect {
+                    Some(path) => fs::write(path, format!("{output}\n"))?,
+                    None => println!("{output}"),
+                }
             }
             Command::Echo { output } => {
                 println!("{}", output)
