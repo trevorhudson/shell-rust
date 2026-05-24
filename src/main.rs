@@ -138,7 +138,7 @@ fn tokenize(input: &str) -> Vec<String> {
                 state = QuoteState::Double;
                 in_token = true
             }
-            // // Outside + escaped char
+            // // Double + escaped char
             (QuoteState::Double, '\\') => escaped = true,
             // Exit single
             (QuoteState::Single, '\'') => state = QuoteState::Outside,
