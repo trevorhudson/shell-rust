@@ -85,12 +85,17 @@ fn main() -> anyhow::Result<()> {
                     None => println!("{output}"),
                 }            }
             Command::Type { target } => {
-                if is_builtin(&target) {
-                    println!("{} is a shell builtin", target)
+                let output = if is_builtin(&target) {
+                    format!("{target} is a shell builtin")
                 } else if let Some(path) = locate_executable(&target) {
-                    println!("{} is {}", target, path.display());
+                    format!("{} is {}", target, path.display())
                 } else {
-                    eprintln!("{}: not found", target);
+                    eprintln!("{target}: not found");
+                    continue;   // jumps to next loop iteration; redirect never consulted
+                };
+                match &parsed.redirect {
+                    Some(path) => fs::write(path, format!("{output}\n"))?,
+                    None => println!("{output}"),
                 }
             }
             Command::Cd { path } => {
