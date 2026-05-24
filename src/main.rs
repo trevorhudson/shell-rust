@@ -12,6 +12,7 @@ enum Command {
     Type { target: String },
     Cd { path: String },
     External { name: String, args: Vec<String> },
+    // Redirect { output: String, path: String}
 }
 
 impl Command {
@@ -19,6 +20,10 @@ impl Command {
         let mut parts = tokenize(input.trim()).into_iter();
         let cmd = parts.next()?;
 
+        println!("{:?}", parts);
+
+        // process each of them to return all args instead of just the next arg they are expecting?
+        // then
         Some(match cmd.as_str() {
             "exit" => Command::Exit,
             "pwd" => Command::Pwd,
@@ -39,6 +44,11 @@ impl Command {
     }
 }
 
+struct ParsedLine {
+    command: Command,
+    // redirect: Option<PathBuf>,
+}
+
 fn main() -> anyhow::Result<()> {
     loop {
         print!("$ ");
@@ -51,6 +61,9 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
+        // Each of these need to be refactored to return an actual result.
+        // That result then needs to be parsed
+        // PROCESS the command. STORE it. CHECK if there's a pipe, and if so, try to pipe it.
         match command {
             Command::Exit => break,
             Command::Pwd => {
