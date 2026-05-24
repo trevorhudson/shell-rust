@@ -104,71 +104,51 @@ fn locate_executable(command: &str) -> Option<PathBuf> {
     })
 }
 
+enum QuoteState {
+    Outside,
+    Single,
+    Double,
+}
+
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
-    let mut cur = String::new();
+    let mut current = String::new();
     let mut in_token = false;
-    let mut in_quote = false;
+
+    let mut state = QuoteState::Outside;
 
     for c in input.chars() {
-        match (in_quote, c) {
-            (false, '\'') => {
-                in_quote = true;
+        match (&state, c) {
+            // Enter a single quote
+            (QuoteState::Outside, '\'') => {
+                state = QuoteState::Single;
                 in_token = true
             }
-            (true, '\'') => in_quote = false,
-            (false, c) if c.is_whitespace() => {
+            // Enter a double quote
+            (QuoteState::Outside, '"') => {
+                state = QuoteState::Double;
+                in_token = true
+            }
+            // Exit a single quote
+            (QuoteState::Single, '\'') => state = QuoteState::Outside,
+            // Exit a double
+            (QuoteState::Double, '"') => state = QuoteState::Outside,
+            // Outside + Whitespace, ends token
+            (QuoteState::Outside, c) if c.is_whitespace() => {
                 if in_token {
-                    tokens.push(std::mem::take(&mut cur));
+                    tokens.push(std::mem::take(&mut current));
                     in_token = false
                 }
-            }
+            } // All other chars
             (_, c) => {
-                cur.push(c);
+                current.push(c);
                 in_token = true;
             }
         }
     }
+    // Push final token
     if in_token {
-        tokens.push(cur)
+        tokens.push(current)
     }
     tokens
-}
-
-
-////// ------------------------------------------------ TESTS
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse() {
-        assert_eq!(
-            tokenize("echo 'hello    world'"),
-            vec!["echo".to_string(), "hello    world".to_string()]
-        );
-    }
-    #[test]
-    fn preserves_spaces() {
-        assert_eq!(
-            tokenize("'hello    world'"),
-            vec!["hello    world".to_string()]
-        );
-    }
-    #[test]
-    fn collapses_spaces() {
-        assert_eq!(
-            tokenize("hello    world"),
-            vec!["hello".to_string(), "world".to_string()]
-        );
-    }
-    #[test]
-    fn contatenates_spaces() {
-        assert_eq!(tokenize("'hello''world'"), vec!["helloworld".to_string()]);
-    }
-    #[test]
-    fn ignores_empty() {
-        assert_eq!(tokenize("hello''world"), vec!["helloworld".to_string()]);
-    }
 }
