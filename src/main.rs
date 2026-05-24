@@ -51,7 +51,8 @@ struct ParsedLine {
 
 impl ParsedLine {
     fn parse(input: &str) -> Option<Self> {
-        todo!()
+        let command = Command::parse(input)?;
+        Some(ParsedLine { command })
     }
 }
 
@@ -63,14 +64,12 @@ fn main() -> anyhow::Result<()> {
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
 
-        let Some(command) = Command::parse(&input) else {
-            continue;
-        };
+        let Some(parsed) = ParsedLine::parse(&input) else { continue };
 
         // Each of these need to be refactored to return an actual result.
         // That result then needs to be parsed
         // PROCESS the command. STORE it. CHECK if there's a pipe, and if so, try to pipe it.
-        match command {
+        match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
                 println!("{}", env::current_dir()?.display());
