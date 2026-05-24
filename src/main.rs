@@ -16,23 +16,24 @@ enum Command {
 
 impl Command {
     fn parse(input: &str) -> Option<Self> {
-        let mut parts = input.split_whitespace();
+        let mut parts = tokenize(input.trim()).into_iter();
         let cmd = parts.next()?;
-        Some(match cmd {
+
+        Some(match cmd.as_str() {
             "exit" => Command::Exit,
             "pwd" => Command::Pwd,
             "echo" => Command::Echo {
-                output: { parts.collect::<Vec<_>>().join(" ") },
+                output: parts.collect::<Vec<_>>().join(" "),
             },
             "cd" => Command::Cd {
-                path: parts.collect::<Vec<_>>().join(" "),
+                path: parts.next()?,
             },
             "type" => Command::Type {
-                target: parts.collect::<Vec<_>>().join(" "),
+                target: parts.next()?,
             },
             _ => Command::External {
-                name: cmd.to_string(),
-                args: parts.map(str::to_string).collect(),
+                name: cmd,
+                args: parts.collect(),
             },
         })
     }
@@ -46,7 +47,7 @@ fn main() -> anyhow::Result<()> {
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
 
-        let Some(command) = Command::parse(input.trim()) else {
+        let Some(command) = Command::parse(&input) else {
             continue;
         };
 
@@ -101,4 +102,73 @@ fn locate_executable(command: &str) -> Option<PathBuf> {
                 .unwrap_or(false))
         .then_some(p)
     })
+}
+
+fn tokenize(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut cur = String::new();
+    let mut in_token = false;
+    let mut in_quote = false;
+
+    for c in input.chars() {
+        match (in_quote, c) {
+            (false, '\'') => {
+                in_quote = true;
+                in_token = true
+            }
+            (true, '\'') => in_quote = false,
+            (false, c) if c.is_whitespace() => {
+                if in_token {
+                    tokens.push(std::mem::take(&mut cur));
+                    in_token = false
+                }
+            }
+            (_, c) => {
+                cur.push(c);
+                in_token = true;
+            }
+        }
+    }
+    if in_token {
+        tokens.push(cur)
+    }
+    tokens
+}
+
+
+////// ------------------------------------------------ TESTS
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse() {
+        assert_eq!(
+            tokenize("echo 'hello    world'"),
+            vec!["echo".to_string(), "hello    world".to_string()]
+        );
+    }
+    #[test]
+    fn preserves_spaces() {
+        assert_eq!(
+            tokenize("'hello    world'"),
+            vec!["hello    world".to_string()]
+        );
+    }
+    #[test]
+    fn collapses_spaces() {
+        assert_eq!(
+            tokenize("hello    world"),
+            vec!["hello".to_string(), "world".to_string()]
+        );
+    }
+    #[test]
+    fn contatenates_spaces() {
+        assert_eq!(tokenize("'hello''world'"), vec!["helloworld".to_string()]);
+    }
+    #[test]
+    fn ignores_empty() {
+        assert_eq!(tokenize("hello''world"), vec!["helloworld".to_string()]);
+    }
 }
