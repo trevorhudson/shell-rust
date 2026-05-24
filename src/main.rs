@@ -114,11 +114,20 @@ fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut in_token = false;
+    let mut escaped = false;
 
     let mut state = QuoteState::Outside;
 
     for c in input.chars() {
         match (&state, c) {
+            // Push next char if escaped
+            (_, c) if escaped => {
+                current.push(c);
+                escaped = false;
+                in_token = true;
+            }
+            // // Outside + escaped char
+            (QuoteState::Outside, '\\') => escaped = true,
             // Enter a single quote
             (QuoteState::Outside, '\'') => {
                 state = QuoteState::Single;
@@ -129,9 +138,9 @@ fn tokenize(input: &str) -> Vec<String> {
                 state = QuoteState::Double;
                 in_token = true
             }
-            // Exit a single quote
+            // Exit single
             (QuoteState::Single, '\'') => state = QuoteState::Outside,
-            // Exit a double
+            // Exit double
             (QuoteState::Double, '"') => state = QuoteState::Outside,
             // Outside + Whitespace, ends token
             (QuoteState::Outside, c) if c.is_whitespace() => {
@@ -139,7 +148,7 @@ fn tokenize(input: &str) -> Vec<String> {
                     tokens.push(std::mem::take(&mut current));
                     in_token = false
                 }
-            } // All other chars
+            } // All other state/char combinations
             (_, c) => {
                 current.push(c);
                 in_token = true;
