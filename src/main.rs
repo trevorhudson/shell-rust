@@ -17,7 +17,7 @@ enum Command {
 impl Command {
     fn from_tokens(input: Vec<String>) -> Option<Self> {
         let mut parts = input.into_iter();
-        let cmd = parts.next()?.to_string();
+        let cmd = parts.next()?;
 
         Some(match cmd.as_str() {
             "exit" => Command::Exit,
@@ -26,10 +26,10 @@ impl Command {
                 output: parts.collect::<Vec<_>>().join(" "),
             },
             "cd" => Command::Cd {
-                path: parts.next()?.to_string(),
+                path: parts.next()?,
             },
             "type" => Command::Type {
-                target: parts.next()?.to_string(),
+                target: parts.next()?,
             },
             _ => Command::External {
                 name: cmd,
