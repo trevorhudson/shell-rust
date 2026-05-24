@@ -49,6 +49,12 @@ struct ParsedLine {
     // redirect: Option<PathBuf>,
 }
 
+impl ParsedLine {
+    fn parse(input: &str) -> Option<Self> {
+        todo!()
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     loop {
         print!("$ ");
