@@ -46,13 +46,14 @@ impl Command {
 
 struct ParsedLine {
     command: Command,
-    // redirect: Option<PathBuf>,
+    redirect: Option<PathBuf>,
 }
 
 impl ParsedLine {
     fn parse(input: &str) -> Option<Self> {
         let command = Command::parse(input)?;
-        Some(ParsedLine { command })
+        let redirect = None;
+        Some(ParsedLine { command, redirect })
     }
 }
 
