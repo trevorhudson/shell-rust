@@ -1,5 +1,8 @@
 use std::{
-    env, fs, io::{self, Write}, os::unix::{fs::PermissionsExt, process::CommandExt}, path::{self, PathBuf}
+    env, fs,
+    io::{self, Write},
+    os::unix::{fs::PermissionsExt, process::CommandExt},
+    path::PathBuf,
 };
 
 enum Command {
@@ -69,7 +72,6 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
-
         match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
@@ -79,11 +81,10 @@ fn main() -> anyhow::Result<()> {
                     None => println!("{output}"),
                 }
             }
-            Command::Echo { output } => {
-                match &parsed.redirect {
-                    Some(path) => fs::write(path, format!("{output}\n"))?,
-                    None => println!("{output}"),
-                }            }
+            Command::Echo { output } => match &parsed.redirect {
+                Some(path) => fs::write(path, format!("{output}\n"))?,
+                None => println!("{output}"),
+            },
             Command::Type { target } => {
                 let output = if is_builtin(&target) {
                     format!("{target} is a shell builtin")
@@ -91,7 +92,7 @@ fn main() -> anyhow::Result<()> {
                     format!("{} is {}", target, path.display())
                 } else {
                     eprintln!("{target}: not found");
-                    continue;   // jumps to next loop iteration; redirect never consulted
+                    continue; // jumps to next loop iteration; redirect never consulted
                 };
                 match &parsed.redirect {
                     Some(path) => fs::write(path, format!("{output}\n"))?,
