@@ -80,8 +80,10 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             Command::Echo { output } => {
-                println!("{}", output)
-            }
+                match &parsed.redirect {
+                    Some(path) => fs::write(path, format!("{output}\n"))?,
+                    None => println!("{output}"),
+                }            }
             Command::Type { target } => {
                 if is_builtin(&target) {
                     println!("{} is a shell builtin", target)
