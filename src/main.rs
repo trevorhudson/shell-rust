@@ -105,9 +105,7 @@ fn main() -> anyhow::Result<()> {
                     eprintln!("cd: {path}: No such file or directory");
                 }
             }
-            Command::External { name, args } =>
-
-            match locate_executable(&name) {
+            Command::External { name, args } => match locate_executable(&name) {
                 Some(path) => {
                     let mut cmd = std::process::Command::new(path);
                     cmd.arg0(name).args(args);
