@@ -12,18 +12,13 @@ enum Command {
     Type { target: String },
     Cd { path: String },
     External { name: String, args: Vec<String> },
-    // Redirect { output: String, path: String}
 }
 
 impl Command {
-    fn parse(input: &str) -> Option<Self> {
-        let mut parts = tokenize(input.trim()).into_iter();
-        let cmd = parts.next()?;
+    fn from_tokens(input: Vec<String>) -> Option<Self> {
+        let mut parts = input.into_iter();
+        let cmd = parts.next()?.to_string();
 
-        println!("{:?}", parts);
-
-        // process each of them to return all args instead of just the next arg they are expecting?
-        // then
         Some(match cmd.as_str() {
             "exit" => Command::Exit,
             "pwd" => Command::Pwd,
@@ -31,10 +26,10 @@ impl Command {
                 output: parts.collect::<Vec<_>>().join(" "),
             },
             "cd" => Command::Cd {
-                path: parts.next()?,
+                path: parts.next()?.to_string(),
             },
             "type" => Command::Type {
-                target: parts.next()?,
+                target: parts.next()?.to_string(),
             },
             _ => Command::External {
                 name: cmd,
@@ -51,8 +46,16 @@ struct ParsedLine {
 
 impl ParsedLine {
     fn parse(input: &str) -> Option<Self> {
-        let command = Command::parse(input)?;
-        let redirect = None;
+        let mut tokens = tokenize(input.trim());
+        let mut redirect: Option<PathBuf> = None;
+        let position = tokens.iter().position(|t| t == ">" || t == "1>");
+
+        if let Some(i) = position {
+            redirect = Some(PathBuf::from(tokens.remove(i + 1)));
+            tokens.remove(i); // remove redirect symbol
+        }
+
+        let command = Command::from_tokens(tokens)?;
         Some(ParsedLine { command, redirect })
     }
 }
@@ -65,11 +68,10 @@ fn main() -> anyhow::Result<()> {
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
 
-        let Some(parsed) = ParsedLine::parse(&input) else { continue };
+        let Some(parsed) = ParsedLine::parse(&input) else {
+            continue;
+        };
 
-        // Each of these need to be refactored to return an actual result.
-        // That result then needs to be parsed
-        // PROCESS the command. STORE it. CHECK if there's a pipe, and if so, try to pipe it.
         match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
