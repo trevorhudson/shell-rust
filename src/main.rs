@@ -39,8 +39,20 @@ impl Command {
     }
 }
 
-struct Redirect { path: PathBuf, mode: Mode}
-enum Mode { Truncate, Append }
+struct Redirect {
+    path: PathBuf,
+    mode: Mode,
+}
+#[derive(Copy, Clone)]
+enum Fd {
+    Stdout,
+    Stderr,
+}
+#[derive(Copy, Clone)]
+enum Mode {
+    Truncate,
+    Append,
+}
 
 struct ParsedLine {
     command: Command,
@@ -54,17 +66,38 @@ impl ParsedLine {
         let mut stdout: Option<Redirect> = None;
         let mut stderr: Option<Redirect> = None;
 
-        let stdout_pos = tokens.iter().position(|t| t == ">" || t == "1>");
+        let mut found: Vec<(usize, Fd, Mode, String)> = Vec::new();
 
-        if let Some(i) = stdout_pos {
-            stdout = Some(Redirect { path: PathBuf::from(tokens.remove(i + 1)), mode: Mode::Truncate});
-            tokens.remove(i); // remove redirect symbol
+        for (i, t) in tokens.iter().enumerate() {
+            let Some((fd, mode)) = (match t.as_str() {
+                ">" | "1>" => Some((Fd::Stdout, Mode::Truncate)),
+                ">>" | "1>>" => Some((Fd::Stdout, Mode::Append)),
+                "2>" => Some((Fd::Stderr, Mode::Truncate)),
+                "2>>" => Some((Fd::Stderr, Mode::Append)),
+                _ => None,
+            }) else {
+                continue;
+            };
+
+            let path = tokens.get(i + 1)?;
+
+            found.push((i, fd, mode, path.clone()))
         }
 
-        let stderr_pos = tokens.iter().position(|t| t == "2>");
-        if let Some(i) = stderr_pos {
-            stderr = Some(Redirect{ path: PathBuf::from(tokens.remove(i + 1)), mode: Mode::Truncate});
-            tokens.remove(i); // remove stderr symbol
+        for f in found.iter().rev() {
+            tokens.remove(f.0 + 1);
+            tokens.remove(f.0);
+        }
+
+        for (_, fd, mode, path) in found.iter() {
+            let redirect = Some(Redirect {
+                path: path.into(),
+                mode: *mode,
+            });
+            match fd {
+                Fd::Stdout => stdout = redirect,
+                Fd::Stderr => stderr = redirect,
+            }
         }
 
         let command = Command::from_tokens(tokens)?;
@@ -89,8 +122,12 @@ fn main() -> anyhow::Result<()> {
         };
 
         // Pre-open/create the file to match bash behavior. May need to refactor later.
-        if let Some(redirect) = &parsed.stdout { fs::File::create(&redirect.path)?; }
-        if let Some(redirect) = &parsed.stderr { fs::File::create(&redirect.path)?; }
+        if let Some(redirect) = &parsed.stdout {
+            fs::File::create(&redirect.path)?;
+        }
+        if let Some(redirect) = &parsed.stderr {
+            fs::File::create(&redirect.path)?;
+        }
 
         match parsed.command {
             Command::Exit => break,
