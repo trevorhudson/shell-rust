@@ -132,42 +132,27 @@ fn main() -> anyhow::Result<()> {
         match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
-                let output = format!("{}", env::current_dir()?.display());
-                match &parsed.stdout {
-                    Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
-                    None => println!("{output}"),
-                }
+                let s = format!("{}", env::current_dir()?.display());
+                write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?
             }
-            Command::Echo { output } => match &parsed.stdout {
-                Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
-                None => println!("{output}"),
-            },
+            Command::Echo { output } => write_to(&output, parsed.stdout.as_ref(), Fd::Stdout)?,
             Command::Type { target } => {
-                let output = if is_builtin(&target) {
-                    format!("{target} is a shell builtin")
-                } else if let Some(path) = locate_executable(&target) {
-                    format!("{} is {}", target, path.display())
+                if is_builtin(&target) {
+                    let s = format!("{target} is a shell builtin");
+                    write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
+                } else if let Some(p) = locate_executable(&target) {
+                    let s = format!("{} is {}", target, p.display());
+                    write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
                 } else {
-                    let output = format!("{target}: not found");
-                    match &parsed.stderr {
-                        Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
-                        None => eprintln!("{output}"),
-                    }
-                    continue;
-                };
-                match &parsed.stdout {
-                    Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
-                    None => println!("{output}"),
+                    let s = format!("{target}: not found");
+                    write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?;
                 }
             }
             Command::Cd { path } => {
                 let path = path.replace("~", &std::env::var("HOME").unwrap_or_default());
                 if std::env::set_current_dir(&path).is_err() {
-                    let output = format!("cd: {path}: No such file or directory");
-                    match &parsed.stderr {
-                        Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
-                        None => eprintln!("{output}"),
-                    }
+                    let s = format!("cd: {path}: No such file or directory");
+                    write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
                 }
             }
             Command::External { name, args } => match locate_executable(&name) {
