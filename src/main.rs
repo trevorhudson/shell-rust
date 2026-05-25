@@ -39,28 +39,31 @@ impl Command {
     }
 }
 
+struct Redirect { path: PathBuf, mode: Mode}
+enum Mode { Truncate, Append }
+
 struct ParsedLine {
     command: Command,
-    stdout: Option<PathBuf>,
-    stderr: Option<PathBuf>,
+    stdout: Option<Redirect>,
+    stderr: Option<Redirect>,
 }
 
 impl ParsedLine {
     fn parse(input: &str) -> Option<Self> {
         let mut tokens = tokenize(input.trim());
-        let mut stdout: Option<PathBuf> = None;
-        let mut stderr: Option<PathBuf> = None;
+        let mut stdout: Option<Redirect> = None;
+        let mut stderr: Option<Redirect> = None;
 
         let stdout_pos = tokens.iter().position(|t| t == ">" || t == "1>");
 
         if let Some(i) = stdout_pos {
-            stdout = Some(PathBuf::from(tokens.remove(i + 1)));
+            stdout = Some(Redirect { path: PathBuf::from(tokens.remove(i + 1)), mode: Mode::Truncate});
             tokens.remove(i); // remove redirect symbol
         }
 
         let stderr_pos = tokens.iter().position(|t| t == "2>");
         if let Some(i) = stderr_pos {
-            stderr = Some(PathBuf::from(tokens.remove(i + 1)));
+            stderr = Some(Redirect{ path: PathBuf::from(tokens.remove(i + 1)), mode: Mode::Truncate});
             tokens.remove(i); // remove stderr symbol
         }
 
@@ -86,20 +89,20 @@ fn main() -> anyhow::Result<()> {
         };
 
         // Pre-open/create the file to match bash behavior. May need to refactor later.
-        if let Some(path) = &parsed.stdout { fs::File::create(path)?; }
-        if let Some(path) = &parsed.stderr { fs::File::create(path)?; }
+        if let Some(redirect) = &parsed.stdout { fs::File::create(&redirect.path)?; }
+        if let Some(redirect) = &parsed.stderr { fs::File::create(&redirect.path)?; }
 
         match parsed.command {
             Command::Exit => break,
             Command::Pwd => {
                 let output = format!("{}", env::current_dir()?.display());
                 match &parsed.stdout {
-                    Some(path) => fs::write(path, format!("{output}\n"))?,
+                    Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
                     None => println!("{output}"),
                 }
             }
             Command::Echo { output } => match &parsed.stdout {
-                Some(path) => fs::write(path, format!("{output}\n"))?,
+                Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
                 None => println!("{output}"),
             },
             Command::Type { target } => {
@@ -110,13 +113,13 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     let output = format!("{target}: not found");
                     match &parsed.stderr {
-                        Some(path) => fs::write(path, format!("{output}\n"))?,
+                        Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
                         None => eprintln!("{output}"),
                     }
                     continue;
                 };
                 match &parsed.stdout {
-                    Some(path) => fs::write(path, format!("{output}\n"))?,
+                    Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
                     None => println!("{output}"),
                 }
             }
@@ -125,7 +128,7 @@ fn main() -> anyhow::Result<()> {
                 if std::env::set_current_dir(&path).is_err() {
                     let output = format!("cd: {path}: No such file or directory");
                     match &parsed.stderr {
-                        Some(path) => fs::write(path, format!("{output}\n"))?,
+                        Some(redirect) => fs::write(&redirect.path, format!("{output}\n"))?,
                         None => eprintln!("{output}"),
                     }
                 }
@@ -135,10 +138,10 @@ fn main() -> anyhow::Result<()> {
                     let mut cmd = std::process::Command::new(path);
                     cmd.arg0(name).args(args);
                     if let Some(redirect) = &parsed.stdout {
-                        cmd.stdout(std::fs::File::create(redirect)?);
+                        cmd.stdout(std::fs::File::create(&redirect.path)?);
                     }
                     if let Some(redirect) = &parsed.stderr {
-                        cmd.stderr(std::fs::File::create(redirect)?);
+                        cmd.stderr(std::fs::File::create(&redirect.path)?);
                     }
                     cmd.status()?;
                 }
