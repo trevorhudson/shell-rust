@@ -189,6 +189,38 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
+    match redirect {
+        Some(r) => {
+            let mut file = match r.mode {
+                Mode::Truncate => fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&r.path)?,
+                Mode::Append => fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&r.path)?,
+            };
+            writeln!(file, "{content}")?;
+            Ok(())
+        }
+
+        None => {
+            match default {
+                Fd::Stdout => {
+                    println!("{content}")
+                }
+                Fd::Stderr => {
+                    eprintln!("{content}")
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
 fn is_builtin(target: &str) -> bool {
     matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
 }
