@@ -160,10 +160,10 @@ fn main() -> anyhow::Result<()> {
                     let mut cmd = std::process::Command::new(path);
                     cmd.arg0(name).args(args);
                     if let Some(redirect) = &parsed.stdout {
-                        cmd.stdout(open_for(&redirect)?);
+                        cmd.stdout(open_for(redirect)?);
                     }
                     if let Some(redirect) = &parsed.stderr {
-                        cmd.stderr(open_for(&redirect)?);
+                        cmd.stderr(open_for(redirect)?);
                     }
                     cmd.status()?;
                 }
@@ -173,7 +173,6 @@ fn main() -> anyhow::Result<()> {
     }
     Ok(())
 }
-
 
 fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
     match redirect {
