@@ -5,6 +5,27 @@ use std::{
     path::PathBuf,
 };
 
+enum QuoteState {
+    Outside,
+    Single,
+    Double,
+}
+
+struct Redirect {
+    path: PathBuf,
+    mode: Mode,
+}
+#[derive(Copy, Clone)]
+enum Fd {
+    Stdout,
+    Stderr,
+}
+#[derive(Copy, Clone)]
+enum Mode {
+    Truncate,
+    Append,
+}
+
 enum Command {
     Exit,
     Pwd,
@@ -37,21 +58,6 @@ impl Command {
             },
         })
     }
-}
-
-struct Redirect {
-    path: PathBuf,
-    mode: Mode,
-}
-#[derive(Copy, Clone)]
-enum Fd {
-    Stdout,
-    Stderr,
-}
-#[derive(Copy, Clone)]
-enum Mode {
-    Truncate,
-    Append,
 }
 
 struct ParsedLine {
@@ -107,6 +113,111 @@ impl ParsedLine {
             stderr,
         })
     }
+}
+
+fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
+    match redirect {
+        Some(r) => {
+            let mut file = open_for(r)?;
+            writeln!(file, "{content}")?;
+            Ok(())
+        }
+        None => {
+            match default {
+                Fd::Stdout => {
+                    println!("{content}")
+                }
+                Fd::Stderr => {
+                    eprintln!("{content}")
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+fn open_for(r: &Redirect) -> io::Result<fs::File> {
+    match r.mode {
+        Mode::Truncate => fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&r.path),
+        Mode::Append => fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&r.path),
+    }
+}
+
+fn is_builtin(target: &str) -> bool {
+    matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
+}
+
+fn locate_executable(command: &str) -> Option<PathBuf> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    std::env::split_paths(&path).find_map(|dir| {
+        let p = dir.join(command);
+        (p.is_file()
+            && p.metadata()
+                .map(|m| m.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false))
+        .then_some(p)
+    })
+}
+
+fn tokenize(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_token = false;
+    let mut escaped = false;
+
+    let mut state = QuoteState::Outside;
+
+    for c in input.chars() {
+        match (&state, c) {
+            // Push next char if escaped
+            (_, c) if escaped => {
+                current.push(c);
+                escaped = false;
+                in_token = true;
+            }
+            // // Outside + escaped char
+            (QuoteState::Outside, '\\') => escaped = true,
+            // Enter a single quote
+            (QuoteState::Outside, '\'') => {
+                state = QuoteState::Single;
+                in_token = true
+            }
+            // Enter a double quote
+            (QuoteState::Outside, '"') => {
+                state = QuoteState::Double;
+                in_token = true
+            }
+            // // Double + escaped char
+            (QuoteState::Double, '\\') => escaped = true,
+            // Exit single
+            (QuoteState::Single, '\'') => state = QuoteState::Outside,
+            // Exit double
+            (QuoteState::Double, '"') => state = QuoteState::Outside,
+            // Outside + Whitespace, ends token
+            (QuoteState::Outside, c) if c.is_whitespace() => {
+                if in_token {
+                    tokens.push(std::mem::take(&mut current));
+                    in_token = false
+                }
+            } // All other state/char combinations
+            (_, c) => {
+                current.push(c);
+                in_token = true;
+            }
+        }
+    }
+    // Push final token
+    if in_token {
+        tokens.push(current)
+    }
+    tokens
 }
 
 fn main() -> anyhow::Result<()> {
@@ -172,115 +283,4 @@ fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
-}
-
-fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
-    match redirect {
-        Some(r) => {
-            let mut file = open_for(r)?;
-            writeln!(file, "{content}")?;
-            Ok(())
-        }
-        None => {
-            match default {
-                Fd::Stdout => {
-                    println!("{content}")
-                }
-                Fd::Stderr => {
-                    eprintln!("{content}")
-                }
-            }
-            Ok(())
-        }
-    }
-}
-
-fn open_for(r: &Redirect) -> io::Result<fs::File> {
-    match r.mode {
-        Mode::Truncate => fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&r.path),
-        Mode::Append => fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&r.path),
-    }
-}
-
-fn is_builtin(target: &str) -> bool {
-    matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
-}
-
-fn locate_executable(command: &str) -> Option<PathBuf> {
-    let path = std::env::var("PATH").unwrap_or_default();
-    std::env::split_paths(&path).find_map(|dir| {
-        let p = dir.join(command);
-        (p.is_file()
-            && p.metadata()
-                .map(|m| m.permissions().mode() & 0o111 != 0)
-                .unwrap_or(false))
-        .then_some(p)
-    })
-}
-
-enum QuoteState {
-    Outside,
-    Single,
-    Double,
-}
-
-fn tokenize(input: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut in_token = false;
-    let mut escaped = false;
-
-    let mut state = QuoteState::Outside;
-
-    for c in input.chars() {
-        match (&state, c) {
-            // Push next char if escaped
-            (_, c) if escaped => {
-                current.push(c);
-                escaped = false;
-                in_token = true;
-            }
-            // // Outside + escaped char
-            (QuoteState::Outside, '\\') => escaped = true,
-            // Enter a single quote
-            (QuoteState::Outside, '\'') => {
-                state = QuoteState::Single;
-                in_token = true
-            }
-            // Enter a double quote
-            (QuoteState::Outside, '"') => {
-                state = QuoteState::Double;
-                in_token = true
-            }
-            // // Double + escaped char
-            (QuoteState::Double, '\\') => escaped = true,
-            // Exit single
-            (QuoteState::Single, '\'') => state = QuoteState::Outside,
-            // Exit double
-            (QuoteState::Double, '"') => state = QuoteState::Outside,
-            // Outside + Whitespace, ends token
-            (QuoteState::Outside, c) if c.is_whitespace() => {
-                if in_token {
-                    tokens.push(std::mem::take(&mut current));
-                    in_token = false
-                }
-            } // All other state/char combinations
-            (_, c) => {
-                current.push(c);
-                in_token = true;
-            }
-        }
-    }
-    // Push final token
-    if in_token {
-        tokens.push(current)
-    }
-    tokens
 }
