@@ -85,7 +85,7 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
-        // Pre-open/create the file
+        // Pre-open/create the file to match bash behavior. May need to refactor later.
         if let Some(path) = &parsed.stdout { fs::File::create(path)?; }
         if let Some(path) = &parsed.stderr { fs::File::create(path)?; }
 
