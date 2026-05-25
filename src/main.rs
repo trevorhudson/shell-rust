@@ -6,35 +6,35 @@ use std::{
 };
 
 enum QuoteState {
+    Double,
     Outside,
     Single,
-    Double,
 }
 
 #[derive(Copy, Clone)]
 enum Fd {
-    Stdout,
     Stderr,
+    Stdout,
 }
 
 #[derive(Copy, Clone)]
 enum Mode {
-    Truncate,
     Append,
+    Truncate,
 }
 
 struct Redirect {
-    path: PathBuf,
     mode: Mode,
+    path: PathBuf,
 }
 
 enum Command {
-    Exit,
-    Pwd,
-    Echo { output: String },
-    Type { target: String },
     Cd { path: String },
-    External { name: String, args: Vec<String> },
+    Echo { output: String },
+    Exit,
+    External { args: Vec<String>, name: String },
+    Pwd,
+    Type { target: String },
 }
 
 impl Command {
@@ -64,8 +64,8 @@ impl Command {
 
 struct ParsedLine {
     command: Command,
-    stdout: Option<Redirect>,
     stderr: Option<Redirect>,
+    stdout: Option<Redirect>,
 }
 
 impl ParsedLine {
@@ -111,8 +111,8 @@ impl ParsedLine {
         let command = Command::from_tokens(tokens)?;
         Some(ParsedLine {
             command,
-            stdout,
             stderr,
+            stdout,
         })
     }
 }
