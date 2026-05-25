@@ -11,11 +11,6 @@ enum QuoteState {
     Double,
 }
 
-struct Redirect {
-    path: PathBuf,
-    mode: Mode,
-}
-
 #[derive(Copy, Clone)]
 enum Fd {
     Stdout,
@@ -26,6 +21,11 @@ enum Fd {
 enum Mode {
     Truncate,
     Append,
+}
+
+struct Redirect {
+    path: PathBuf,
+    mode: Mode,
 }
 
 enum Command {
