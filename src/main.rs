@@ -123,10 +123,10 @@ fn main() -> anyhow::Result<()> {
 
         // Pre-open/create the file to match bash behavior. May need to refactor later.
         if let Some(redirect) = &parsed.stdout {
-            fs::File::create(&redirect.path)?;
+            open_for(redirect)?;
         }
         if let Some(redirect) = &parsed.stderr {
-            fs::File::create(&redirect.path)?;
+            open_for(redirect)?;
         }
 
         match parsed.command {
@@ -160,10 +160,10 @@ fn main() -> anyhow::Result<()> {
                     let mut cmd = std::process::Command::new(path);
                     cmd.arg0(name).args(args);
                     if let Some(redirect) = &parsed.stdout {
-                        cmd.stdout(std::fs::File::create(&redirect.path)?);
+                        cmd.stdout(open_for(&redirect)?);
                     }
                     if let Some(redirect) = &parsed.stderr {
-                        cmd.stderr(std::fs::File::create(&redirect.path)?);
+                        cmd.stderr(open_for(&redirect)?);
                     }
                     cmd.status()?;
                 }
