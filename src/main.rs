@@ -5,6 +5,13 @@ use std::{
     path::PathBuf,
 };
 
+use rustyline::completion::{Completer, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::{Context, Editor};
+use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
+
+const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd"];
+
 enum QuoteState {
     Double,
     Outside,
@@ -117,8 +124,33 @@ impl ParsedLine {
     }
 }
 
+#[derive(Helper, Hinter, Highlighter, Validator)]
+struct ShellHelper;
+
+impl Completer for ShellHelper {
+    type Candidate = Pair;
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        let prefix = &line[..pos];
+        let candidates: Vec<Pair> = BUILTINS
+            .iter()
+            .filter(|b| b.starts_with(prefix))
+            .map(|b| Pair {
+                display: b.to_string(),
+                replacement: format!("{b} "),
+            })
+            .collect();
+        Ok((0, candidates))
+    }
+}
+
 // ------------------------------------------ functions ------------------------------------------------
 
+/** Write to a file, or print */
 fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
     match redirect {
         Some(r) => {
@@ -142,7 +174,7 @@ fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Resu
 
 /* Check if a command is a built in */
 fn is_builtin(target: &str) -> bool {
-    matches!(target, "exit" | "type" | "echo" | "pwd" | "cd")
+    BUILTINS.contains(&target)
 }
 
 /** Opens a file to truncate or append */
@@ -231,11 +263,18 @@ fn tokenize(input: &str) -> Vec<String> {
 // ---------------------------------------------------------- main ----------------------------------------------------
 
 fn main() -> anyhow::Result<()> {
-    loop {
-        let mut rl = rustyline::DefaultEditor::new()?;
-        let input = rl.readline("$ ")?;
+    let mut editor = Editor::<ShellHelper, _>::new()?;
+    editor.set_helper(Some(ShellHelper));
 
-        let Some(parsed) = ParsedLine::parse(&input) else {
+    loop {
+        let line = match editor.readline("$ ") {
+            Ok(line) => line,
+            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) => continue,
+            Err(e) => return Err(e.into()),
+        };
+
+        let Some(parsed) = ParsedLine::parse(&line) else {
             continue;
         };
 
