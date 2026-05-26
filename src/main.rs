@@ -117,6 +117,8 @@ impl ParsedLine {
     }
 }
 
+// ------------------------------------------ functions ------------------------------------------------
+
 fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
     match redirect {
         Some(r) => {
@@ -226,13 +228,12 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
+// ---------------------------------------------------------- main ----------------------------------------------------
+
 fn main() -> anyhow::Result<()> {
     loop {
-        print!("$ ");
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
+        let mut rl = rustyline::DefaultEditor::new()?;
+        let input = rl.readline("$ ")?;
 
         let Some(parsed) = ParsedLine::parse(&input) else {
             continue;
