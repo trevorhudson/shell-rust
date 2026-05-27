@@ -136,6 +136,7 @@ impl Completer for ShellHelper {
         _ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let prefix = &line[..pos];
+
         let candidates: Vec<Pair> = BUILTINS
             .iter()
             .filter(|b| b.starts_with(prefix))
@@ -190,6 +191,35 @@ fn open_for(r: &Redirect) -> io::Result<fs::File> {
             .append(true)
             .open(&r.path),
     }
+}
+
+/** Walks PATH and returns sorted executable names */
+fn collect_executables() -> Vec<String> {
+    let path = std::env::var("PATH").unwrap_or_default();
+
+    let mut names: Vec<String> = Vec::new();
+    for dir in std::env::split_paths(&path) {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let exec = path
+                .metadata()
+                .map(|m| m.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false);
+            if !exec {
+                continue;
+            }
+            names.push(entry.file_name().to_string_lossy().to_string());
+        }
+    }
+    names.sort();
+    names.dedup();
+    names
 }
 
 /* Find a path for an executable */
@@ -265,6 +295,8 @@ fn tokenize(input: &str) -> Vec<String> {
 fn main() -> anyhow::Result<()> {
     let mut editor = Editor::<ShellHelper, _>::new()?;
     editor.set_helper(Some(ShellHelper));
+
+    let _path = std::env::var("PATH").unwrap_or_default();
 
     loop {
         let line = match editor.readline("$ ") {
