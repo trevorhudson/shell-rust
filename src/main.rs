@@ -126,7 +126,7 @@ impl ParsedLine {
 
 #[derive(Helper, Hinter, Highlighter, Validator)]
 struct ShellHelper {
-    executables: Vec<String>
+    executables: Vec<String>,
 }
 
 impl Completer for ShellHelper {
@@ -298,7 +298,9 @@ fn tokenize(input: &str) -> Vec<String> {
 
 fn main() -> anyhow::Result<()> {
     let mut editor = Editor::<ShellHelper, _>::new()?;
-    editor.set_helper(Some(ShellHelper { executables: collect_executables()}));
+    editor.set_helper(Some(ShellHelper {
+        executables: collect_executables(),
+    }));
 
     let _path = std::env::var("PATH").unwrap_or_default();
 
