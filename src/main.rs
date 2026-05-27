@@ -125,7 +125,9 @@ impl ParsedLine {
 }
 
 #[derive(Helper, Hinter, Highlighter, Validator)]
-struct ShellHelper;
+struct ShellHelper {
+    executables: Vec<String>
+}
 
 impl Completer for ShellHelper {
     type Candidate = Pair;
@@ -139,6 +141,8 @@ impl Completer for ShellHelper {
 
         let candidates: Vec<Pair> = BUILTINS
             .iter()
+            .map(|s| s.to_string())
+            .chain(self.executables.iter().cloned())
             .filter(|b| b.starts_with(prefix))
             .map(|b| Pair {
                 display: b.to_string(),
@@ -294,7 +298,7 @@ fn tokenize(input: &str) -> Vec<String> {
 
 fn main() -> anyhow::Result<()> {
     let mut editor = Editor::<ShellHelper, _>::new()?;
-    editor.set_helper(Some(ShellHelper));
+    editor.set_helper(Some(ShellHelper { executables: collect_executables()}));
 
     let _path = std::env::var("PATH").unwrap_or_default();
 
