@@ -155,7 +155,7 @@ impl Completer for ShellHelper {
 
 // ------------------------------------------ functions ------------------------------------------------
 
-/** Write to a file, or print */
+/// Write to a file, or print
 fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
     match redirect {
         Some(r) => {
@@ -177,12 +177,12 @@ fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Resu
     }
 }
 
-/* Check if a command is a built in */
+/// Check if a command is a built in
 fn is_builtin(target: &str) -> bool {
     BUILTINS.contains(&target)
 }
 
-/** Opens a file to truncate or append */
+/// Opens a file to truncate or append
 fn open_for(r: &Redirect) -> io::Result<fs::File> {
     match r.mode {
         Mode::Truncate => fs::OpenOptions::new()
@@ -197,7 +197,7 @@ fn open_for(r: &Redirect) -> io::Result<fs::File> {
     }
 }
 
-/** Walks PATH and returns sorted executable names */
+/// Walks PATH and returns sorted executable names
 fn collect_executables() -> Vec<String> {
     let path = std::env::var("PATH").unwrap_or_default();
 
@@ -226,7 +226,7 @@ fn collect_executables() -> Vec<String> {
     names
 }
 
-/* Find a path for an executable */
+/// Find a path for an executable
 fn locate_executable(command: &str) -> Option<PathBuf> {
     let path = std::env::var("PATH").unwrap_or_default();
     std::env::split_paths(&path).find_map(|dir| {
@@ -239,7 +239,7 @@ fn locate_executable(command: &str) -> Option<PathBuf> {
     })
 }
 
-/* Parse user input into tokens. Respects common bash quotation and character escape rules */
+/// Parse user input into tokens. Respects common bash quotation and character escape rules
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -302,7 +302,7 @@ fn main() -> anyhow::Result<()> {
         executables: collect_executables(),
     }));
 
-    let _path = std::env::var("PATH").unwrap_or_default();
+    // DELETE let _path = std::env::var("PATH").unwrap_or_default();
 
     loop {
         let line = match editor.readline("$ ") {
