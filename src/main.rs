@@ -1,6 +1,7 @@
 use std::{
     env, fs,
     io::{self, Write},
+    ops::ControlFlow,
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::PathBuf,
 };
@@ -294,6 +295,63 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
+fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
+    let Some(parsed) = ParsedLine::parse(line) else {
+        return Ok(ControlFlow::Continue(()));
+    };
+
+    // Pre-open/create the file to match bash behavior. May need to refactor later.
+    if let Some(redirect) = &parsed.stdout {
+        open_for(redirect)?;
+    }
+    if let Some(redirect) = &parsed.stderr {
+        open_for(redirect)?;
+    }
+
+    match parsed.command {
+        Command::Exit => return Ok(ControlFlow::Break(())),
+        Command::Pwd => {
+            let s = format!("{}", env::current_dir()?.display());
+            write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?
+        }
+        Command::Echo { output } => write_to(&output, parsed.stdout.as_ref(), Fd::Stdout)?,
+        Command::Type { target } => {
+            if is_builtin(&target) {
+                let s = format!("{target} is a shell builtin");
+                write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
+            } else if let Some(p) = locate_executable(&target) {
+                let s = format!("{} is {}", target, p.display());
+                write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
+            } else {
+                let s = format!("{target}: not found");
+                write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?;
+            }
+        }
+        Command::Cd { path } => {
+            let path = path.replace("~", &std::env::var("HOME").unwrap_or_default());
+            if std::env::set_current_dir(&path).is_err() {
+                let s = format!("cd: {path}: No such file or directory");
+                write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
+            }
+        }
+        Command::External { name, args } => match locate_executable(&name) {
+            Some(path) => {
+                let mut cmd = std::process::Command::new(path);
+                cmd.arg0(name).args(args);
+                if let Some(redirect) = &parsed.stdout {
+                    cmd.stdout(open_for(redirect)?);
+                }
+                if let Some(redirect) = &parsed.stderr {
+                    cmd.stderr(open_for(redirect)?);
+                }
+                cmd.status()?;
+            }
+            None => eprintln!("{}: command not found", name),
+        },
+    }
+    Ok(ControlFlow::Continue(()))
+}
+
 // ---------------------------------------------------------- main ----------------------------------------------------
 
 fn main() -> anyhow::Result<()> {
@@ -309,59 +367,10 @@ fn main() -> anyhow::Result<()> {
             Err(ReadlineError::Interrupted) => continue,
             Err(e) => return Err(e.into()),
         };
-
-        let Some(parsed) = ParsedLine::parse(&line) else {
-            continue;
-        };
-
-        // Pre-open/create the file to match bash behavior. May need to refactor later.
-        if let Some(redirect) = &parsed.stdout {
-            open_for(redirect)?;
-        }
-        if let Some(redirect) = &parsed.stderr {
-            open_for(redirect)?;
-        }
-
-        match parsed.command {
-            Command::Exit => break,
-            Command::Pwd => {
-                let s = format!("{}", env::current_dir()?.display());
-                write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?
-            }
-            Command::Echo { output } => write_to(&output, parsed.stdout.as_ref(), Fd::Stdout)?,
-            Command::Type { target } => {
-                if is_builtin(&target) {
-                    let s = format!("{target} is a shell builtin");
-                    write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
-                } else if let Some(p) = locate_executable(&target) {
-                    let s = format!("{} is {}", target, p.display());
-                    write_to(&s, parsed.stdout.as_ref(), Fd::Stdout)?;
-                } else {
-                    let s = format!("{target}: not found");
-                    write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?;
-                }
-            }
-            Command::Cd { path } => {
-                let path = path.replace("~", &std::env::var("HOME").unwrap_or_default());
-                if std::env::set_current_dir(&path).is_err() {
-                    let s = format!("cd: {path}: No such file or directory");
-                    write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
-                }
-            }
-            Command::External { name, args } => match locate_executable(&name) {
-                Some(path) => {
-                    let mut cmd = std::process::Command::new(path);
-                    cmd.arg0(name).args(args);
-                    if let Some(redirect) = &parsed.stdout {
-                        cmd.stdout(open_for(redirect)?);
-                    }
-                    if let Some(redirect) = &parsed.stderr {
-                        cmd.stderr(open_for(redirect)?);
-                    }
-                    cmd.status()?;
-                }
-                None => eprintln!("{}: command not found", name),
-            },
+        match run_line(&line) {
+            Ok(ControlFlow::Break(())) => break,
+            Ok(ControlFlow::Continue(())) => {}
+            Err(e) => eprintln!("shell: {e}"),
         }
     }
     Ok(())
