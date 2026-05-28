@@ -302,8 +302,6 @@ fn main() -> anyhow::Result<()> {
         executables: collect_executables(),
     }));
 
-    // DELETE let _path = std::env::var("PATH").unwrap_or_default();
-
     loop {
         let line = match editor.readline("$ ") {
             Ok(line) => line,
