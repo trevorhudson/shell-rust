@@ -295,6 +295,19 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
+fn expand_tilde(token: String) -> String {
+    let Ok(home) = std::env::var("HOME") else {
+        return token;
+    };
+    if token == "~" {
+        return home;
+    }
+    if let Some(rest) = token.strip_prefix("~/") {
+        return format!("{home}/{rest}");
+    }
+    token
+}
+
 fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
     let Some(parsed) = ParsedLine::parse(line) else {
         return Ok(ControlFlow::Continue(()));
@@ -328,9 +341,9 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
             }
         }
         Command::Cd { path } => {
-            let path = path.replace("~", &std::env::var("HOME").unwrap_or_default());
-            if std::env::set_current_dir(&path).is_err() {
-                let s = format!("cd: {path}: No such file or directory");
+            let target = expand_tilde(path);
+            if std::env::set_current_dir(&target).is_err() {
+                let s = format!("cd: {target}: No such file or directory");
                 write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
             }
         }
