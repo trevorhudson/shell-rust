@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
     ops::ControlFlow,
     os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use rustyline::completion::{Completer, Pair};
@@ -208,17 +208,7 @@ fn collect_executables() -> Vec<String> {
             continue;
         };
         for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let exec = path
-                .metadata()
-                .map(|m| m.permissions().mode() & 0o111 != 0)
-                .unwrap_or(false);
-            if !exec {
-                continue;
-            }
+            if !is_executable(&entry.path()) { continue; }
             names.push(entry.file_name().to_string_lossy().to_string());
         }
     }
@@ -232,12 +222,14 @@ fn locate_executable(command: &str) -> Option<PathBuf> {
     let path = std::env::var("PATH").unwrap_or_default();
     std::env::split_paths(&path).find_map(|dir| {
         let p = dir.join(command);
-        (p.is_file()
-            && p.metadata()
-                .map(|m| m.permissions().mode() & 0o111 != 0)
-                .unwrap_or(false))
-        .then_some(p)
+        is_executable(&p).then_some(p)
     })
+}
+
+fn is_executable(path: &Path) -> bool {
+    path.metadata()
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
 }
 
 /// Parse user input into tokens. Respects common bash quotation and character escape rules
