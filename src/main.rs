@@ -226,6 +226,7 @@ fn locate_executable(command: &str) -> Option<PathBuf> {
     })
 }
 
+/// Checks whether a path is a file and is executable
 fn is_executable(path: &Path) -> bool {
     path.metadata()
         .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
@@ -287,6 +288,7 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
+/// Replaces a leading ~ with the path of HOME
 fn expand_tilde(token: String) -> String {
     let Ok(home) = std::env::var("HOME") else {
         return token;
