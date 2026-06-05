@@ -8,7 +8,7 @@ use std::{
 
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
-use rustyline::{Context, Editor};
+use rustyline::{CompletionType, Config, Context, Editor};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
 const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd"];
@@ -362,7 +362,8 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
 // ---------------------------------------------------------- main ----------------------------------------------------
 
 fn main() -> anyhow::Result<()> {
-    let mut editor = Editor::<ShellHelper, _>::new()?;
+    let config = Config::builder().completion_type(CompletionType::List).build();
+    let mut editor = Editor::<ShellHelper, _>::with_config(config)?;
     editor.set_helper(Some(ShellHelper {
         executables: collect_executables(),
     }));
