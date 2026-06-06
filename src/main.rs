@@ -37,6 +37,11 @@ struct Redirect {
     path: PathBuf,
 }
 
+enum CompleteOp {
+    Register { cmd: String, path: String }, // -C
+    Print { cmd: String },                  // -P
+}
+
 enum Command {
     Cd { path: String },
     Echo { output: String },
@@ -44,7 +49,7 @@ enum Command {
     External { args: Vec<String>, name: String },
     Pwd,
     Type { target: String },
-    Complete { flag: String, args: Vec<String> },
+    Complete(CompleteOp),
 }
 
 impl Command {
@@ -64,9 +69,14 @@ impl Command {
             "type" => Command::Type {
                 target: parts.next()?,
             },
-            "complete" => Command::Complete {
-                flag: parts.next()?,
-                args: parts.collect(),
+            "complete" => match parts.next()?.as_str() {
+                "-C" => {
+                    let path = parts.next()?;
+                    let cmd = parts.next()?;
+                    Command::Complete(CompleteOp::Register { cmd, path })
+                }
+                "-p" => Command::Complete(CompleteOp::Print { cmd: parts.next()? }),
+                _ => return None,
             },
             _ => Command::External {
                 name: cmd,
@@ -384,23 +394,16 @@ fn run_line(line: &str, completions: &mut HashMap<String, String>) -> io::Result
                 write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
             }
         }
-        Command::Complete { flag, args } => match flag.as_str() {
-            "-p" => {
-                let cmd = &args[0];
-                if let Some(c) = completions.get(&cmd.clone()) {
-                    println!("complete -C '{c}' {cmd}")
-                } else {
-                    eprintln!("complete: {cmd}: no completion specification")
-                }
+        Command::Complete(CompleteOp::Register { cmd, path }) => {
+            completions.insert(cmd, path);
+        }
+        Command::Complete(CompleteOp::Print { cmd }) => {
+            if let Some(c) = completions.get(&cmd) {
+                println!("complete -C '{c}' {cmd}")
+            } else {
+                eprintln!("complete: {cmd}: no completion specification")
             }
-            "-C" => {
-                let path = &args[0];
-                let cmd = &args[1];
-                completions.insert(cmd.clone(), path.clone());
-            }
-            _ => (),
-        },
-
+        }
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
                 let mut cmd = std::process::Command::new(path);
