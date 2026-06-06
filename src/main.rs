@@ -164,6 +164,14 @@ impl Completer for ShellHelper {
             self.files.complete(line, pos, ctx)?
         };
 
+        // FilenameCompleter puts the trailing `/` only on `replacement`, not `display`.
+        // Mirror it onto `display` so directories stand out in the listing.
+        for c in candidates.iter_mut() {
+            if c.replacement.ends_with('/') && !c.display.ends_with('/') {
+                c.display.push('/');
+            }
+        }
+
         // Bash convention: unique match gets a trailing space, except directories
         // (which FilenameCompleter already terminates with `/`).
         if let [only] = candidates.as_mut_slice()
