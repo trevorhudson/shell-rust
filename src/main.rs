@@ -43,7 +43,7 @@ enum Command {
     External { args: Vec<String>, name: String },
     Pwd,
     Type { target: String },
-    // Complete,
+    Complete { flag: String, command: String },
 }
 
 impl Command {
@@ -62,6 +62,10 @@ impl Command {
             },
             "type" => Command::Type {
                 target: parts.next()?,
+            },
+            "complete" => Command::Complete {
+                flag: parts.next()?,
+                command: parts.next()?,
             },
             _ => Command::External {
                 name: cmd,
@@ -379,6 +383,10 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
                 write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
             }
         }
+        Command::Complete { flag: _, command } => {
+            eprintln!("complete: {command}: no completion specification");
+        }
+
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
                 let mut cmd = std::process::Command::new(path);
