@@ -1,12 +1,8 @@
 use std::{
-    env, fs,
-    io::{self, Write},
-    ops::ControlFlow,
-    os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::{Path, PathBuf},
+    env, fs, io::{self, Write}, ops::ControlFlow, os::unix::{fs::PermissionsExt, process::CommandExt}, path::{Path, PathBuf}
 };
 
-use rustyline::completion::{Completer, Pair};
+use rustyline::completion::{extract_word, Completer, FilenameCompleter, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Context, Editor};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
@@ -128,29 +124,55 @@ impl ParsedLine {
 #[derive(Helper, Hinter, Highlighter, Validator)]
 struct ShellHelper {
     executables: Vec<String>,
+    files: FilenameCompleter,
 }
 
-impl Completer for ShellHelper {
-    type Candidate = Pair;
-    fn complete(
-        &self,
-        line: &str,
-        pos: usize,
-        _ctx: &Context<'_>,
-    ) -> rustyline::Result<(usize, Vec<Pair>)> {
-        let prefix = &line[..pos];
-
-        let candidates: Vec<Pair> = BUILTINS
+impl ShellHelper {
+    fn complete_command(&self, prefix: &str) -> Vec<Pair> {
+        let mut names: Vec<String> = BUILTINS
             .iter()
             .map(|s| s.to_string())
             .chain(self.executables.iter().cloned())
             .filter(|b| b.starts_with(prefix))
-            .map(|b| Pair {
-                display: b.to_string(),
-                replacement: format!("{b} "),
-            })
             .collect();
-        Ok((0, candidates))
+        names.sort();
+        names.dedup();
+        names
+            .into_iter()
+            .map(|b| Pair {
+                display: b.clone(),
+                replacement: b,
+            })
+            .collect()
+    }
+}
+
+impl Completer for ShellHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        let (word_start, word) = extract_word(line, pos, Some('\\'), char::is_whitespace);
+
+        let (start, mut candidates) = if word_start == 0 {
+            (0, self.complete_command(word))
+        } else {
+            self.files.complete(line, pos, ctx)?
+        };
+
+        // Bash convention: unique match gets a trailing space, except directories
+        // (which FilenameCompleter already terminates with `/`).
+        if let [only] = candidates.as_mut_slice()
+            && !only.replacement.ends_with('/')
+        {
+            only.replacement.push(' ');
+        }
+
+        Ok((start, candidates))
     }
 }
 
@@ -212,6 +234,7 @@ fn collect_executables() -> Vec<String> {
             names.push(entry.file_name().to_string_lossy().to_string());
         }
     }
+
     names.sort();
     names.dedup();
     names
@@ -364,8 +387,10 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
 fn main() -> anyhow::Result<()> {
     let config = Config::builder().completion_type(CompletionType::List).build();
     let mut editor = Editor::<ShellHelper, _>::with_config(config)?;
+
     editor.set_helper(Some(ShellHelper {
         executables: collect_executables(),
+        files: FilenameCompleter::new(),
     }));
 
     loop {
