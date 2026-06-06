@@ -43,7 +43,7 @@ enum Command {
     External { args: Vec<String>, name: String },
     Pwd,
     Type { target: String },
-    Complete { flag: String, command: String },
+    Complete { flag: String, args: Vec<String> },
 }
 
 impl Command {
@@ -65,7 +65,7 @@ impl Command {
             },
             "complete" => Command::Complete {
                 flag: parts.next()?,
-                command: parts.next()?,
+                args: parts.collect(),
             },
             _ => Command::External {
                 name: cmd,
@@ -383,9 +383,22 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
                 write_to(&s, parsed.stderr.as_ref(), Fd::Stderr)?
             }
         }
-        Command::Complete { flag: _, command } => {
-            eprintln!("complete: {command}: no completion specification");
-        }
+        Command::Complete { flag, args } => match flag.as_str() {
+            "-p" => {
+                let cmd = &args[0];
+                // Fetch cmd from history
+                // if found, print:
+                // complete -C '/path/to/<command>/completer' <command>
+                // If not found, print error
+                eprintln!("complete: {cmd}: no completion specification")
+            }
+            "-C" => {
+                let cmd = &args[0];
+                let path = &args[1];
+                // Register the completion, produces no output
+            }
+            _ => (),
+        },
 
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
