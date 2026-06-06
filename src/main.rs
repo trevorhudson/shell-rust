@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env, fs,
     io::{self, Write},
     ops::ControlFlow,
@@ -344,7 +345,7 @@ fn expand_tilde(token: String) -> String {
     token
 }
 
-fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
+fn run_line(line: &str, completions: &mut HashMap<String, String>) -> io::Result<ControlFlow<()>> {
     let Some(parsed) = ParsedLine::parse(line) else {
         return Ok(ControlFlow::Continue(()));
     };
@@ -386,16 +387,16 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
         Command::Complete { flag, args } => match flag.as_str() {
             "-p" => {
                 let cmd = &args[0];
-                // Fetch cmd from history
-                // if found, print:
-                // complete -C '/path/to/<command>/completer' <command>
-                // If not found, print error
-                eprintln!("complete: {cmd}: no completion specification")
+                if let Some(c) = completions.get(&cmd.clone()) {
+                    println!("complete -C '{c}' {cmd}")
+                } else {
+                    eprintln!("complete: {cmd}: no completion specification")
+                }
             }
             "-C" => {
-                let cmd = &args[0];
-                let path = &args[1];
-                // Register the completion, produces no output
+                let path = &args[0];
+                let cmd = &args[1];
+                completions.insert(cmd.clone(), path.clone());
             }
             _ => (),
         },
@@ -431,6 +432,8 @@ fn main() -> anyhow::Result<()> {
         files: FilenameCompleter::new(),
     }));
 
+    let mut completions: HashMap<String, String> = HashMap::new();
+
     loop {
         let line = match editor.readline("$ ") {
             Ok(line) => line,
@@ -438,7 +441,7 @@ fn main() -> anyhow::Result<()> {
             Err(ReadlineError::Interrupted) => continue,
             Err(e) => return Err(e.into()),
         };
-        match run_line(&line) {
+        match run_line(&line, &mut completions) {
             Ok(ControlFlow::Break(())) => break,
             Ok(ControlFlow::Continue(())) => {}
             Err(e) => eprintln!("shell: {e}"),
