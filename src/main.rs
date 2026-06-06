@@ -11,7 +11,7 @@ use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Context, Editor};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd"];
+const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd", "complete"];
 
 enum QuoteState {
     Double,
@@ -43,6 +43,7 @@ enum Command {
     External { args: Vec<String>, name: String },
     Pwd,
     Type { target: String },
+    // Complete,
 }
 
 impl Command {
