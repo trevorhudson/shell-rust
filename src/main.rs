@@ -1,8 +1,12 @@
 use std::{
-    env, fs, io::{self, Write}, ops::ControlFlow, os::unix::{fs::PermissionsExt, process::CommandExt}, path::{Path, PathBuf}
+    env, fs,
+    io::{self, Write},
+    ops::ControlFlow,
+    os::unix::{fs::PermissionsExt, process::CommandExt},
+    path::{Path, PathBuf},
 };
 
-use rustyline::completion::{extract_word, Completer, FilenameCompleter, Pair};
+use rustyline::completion::{Completer, FilenameCompleter, Pair, extract_word};
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Context, Editor};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
@@ -238,7 +242,9 @@ fn collect_executables() -> Vec<String> {
             continue;
         };
         for entry in entries.flatten() {
-            if !is_executable(&entry.path()) { continue; }
+            if !is_executable(&entry.path()) {
+                continue;
+            }
             names.push(entry.file_name().to_string_lossy().to_string());
         }
     }
@@ -393,7 +399,9 @@ fn run_line(line: &str) -> io::Result<ControlFlow<()>> {
 // ---------------------------------------------------------- main ----------------------------------------------------
 
 fn main() -> anyhow::Result<()> {
-    let config = Config::builder().completion_type(CompletionType::List).build();
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
     let mut editor = Editor::<ShellHelper, _>::with_config(config)?;
 
     editor.set_helper(Some(ShellHelper {
