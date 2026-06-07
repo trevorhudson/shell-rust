@@ -20,6 +20,11 @@ enum QuoteState {
     Single,
 }
 
+enum Token {
+    Word(String),
+    Redirect { fd: Fd, mode: Mode },
+}
+
 #[derive(Copy, Clone)]
 enum Fd {
     Stderr,
@@ -92,47 +97,67 @@ struct ParsedLine {
     stdout: Option<Redirect>,
 }
 
+fn classify(text: String, quoted: bool) -> Token {
+    if !quoted {
+        match text.as_str() {
+            ">" | "1>" => {
+                return Token::Redirect {
+                    fd: Fd::Stdout,
+                    mode: Mode::Truncate,
+                };
+            }
+            ">>" | "1>>" => {
+                return Token::Redirect {
+                    fd: Fd::Stdout,
+                    mode: Mode::Append,
+                };
+            }
+            "2>" => {
+                return Token::Redirect {
+                    fd: Fd::Stderr,
+                    mode: Mode::Truncate,
+                };
+            }
+            "2>>" => {
+                return Token::Redirect {
+                    fd: Fd::Stderr,
+                    mode: Mode::Append,
+                };
+            }
+            _ => {}
+        }
+    }
+    Token::Word(text)
+}
+
 impl ParsedLine {
     fn parse(input: &str) -> Option<Self> {
-        let mut tokens = tokenize(input.trim());
         let mut stdout: Option<Redirect> = None;
         let mut stderr: Option<Redirect> = None;
+        let mut words: Vec<String> = Vec::new();
 
-        let mut found: Vec<(usize, Fd, Mode, String)> = Vec::new();
-
-        for (i, t) in tokens.iter().enumerate() {
-            let Some((fd, mode)) = (match t.as_str() {
-                ">" | "1>" => Some((Fd::Stdout, Mode::Truncate)),
-                ">>" | "1>>" => Some((Fd::Stdout, Mode::Append)),
-                "2>" => Some((Fd::Stderr, Mode::Truncate)),
-                "2>>" => Some((Fd::Stderr, Mode::Append)),
-                _ => None,
-            }) else {
-                continue;
-            };
-
-            let path = tokens.get(i + 1)?;
-
-            found.push((i, fd, mode, path.clone()))
-        }
-
-        for f in found.iter().rev() {
-            tokens.remove(f.0 + 1);
-            tokens.remove(f.0);
-        }
-
-        for (_, fd, mode, path) in found.iter() {
-            let redirect = Some(Redirect {
-                path: path.into(),
-                mode: *mode,
-            });
-            match fd {
-                Fd::Stdout => stdout = redirect,
-                Fd::Stderr => stderr = redirect,
+        let mut tokens = tokenize(input.trim()).into_iter();
+        while let Some(token) = tokens.next() {
+            match token {
+                Token::Word(w) => words.push(w),
+                Token::Redirect { fd, mode } => {
+                    // target is the next token, and it must be a word
+                    let Token::Word(path) = tokens.next()? else {
+                        return None; // dangling redirect -> syntax error
+                    };
+                    let redirect = Some(Redirect {
+                        path: path.into(),
+                        mode,
+                    });
+                    match fd {
+                        Fd::Stdout => stdout = redirect,
+                        Fd::Stderr => stderr = redirect,
+                    }
+                }
             }
         }
 
-        let command = Command::from_tokens(tokens)?;
+        let command = Command::from_tokens(words)?;
         Some(ParsedLine {
             command,
             stderr,
@@ -287,10 +312,11 @@ fn is_executable(path: &Path) -> bool {
 }
 
 /// Parse user input into tokens. Respects common bash quotation and character escape rules
-fn tokenize(input: &str) -> Vec<String> {
+fn tokenize(input: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut in_token = false;
+    let mut quoted = false;
     let mut escaped = false;
 
     let mut state = QuoteState::Outside;
@@ -304,16 +330,21 @@ fn tokenize(input: &str) -> Vec<String> {
                 in_token = true;
             }
             // // Outside + escaped char
-            (QuoteState::Outside, '\\') => escaped = true,
+            (QuoteState::Outside, '\\') => {
+                escaped = true;
+                quoted = true
+            }
             // Enter a single quote
             (QuoteState::Outside, '\'') => {
                 state = QuoteState::Single;
-                in_token = true
+                in_token = true;
+                quoted = true
             }
             // Enter a double quote
             (QuoteState::Outside, '"') => {
                 state = QuoteState::Double;
-                in_token = true
+                in_token = true;
+                quoted = true
             }
             // // Double + escaped char
             (QuoteState::Double, '\\') => escaped = true,
@@ -324,7 +355,10 @@ fn tokenize(input: &str) -> Vec<String> {
             // Outside + Whitespace, ends token
             (QuoteState::Outside, c) if c.is_whitespace() => {
                 if in_token {
-                    tokens.push(std::mem::take(&mut current));
+                    tokens.push(classify(
+                        std::mem::take(&mut current),
+                        std::mem::take(&mut quoted),
+                    ));
                     in_token = false
                 }
             } // All other state/char combinations
@@ -336,7 +370,10 @@ fn tokenize(input: &str) -> Vec<String> {
     }
     // Push final token
     if in_token {
-        tokens.push(current)
+        tokens.push(classify(
+            std::mem::take(&mut current),
+            std::mem::take(&mut quoted),
+        ));
     }
     tokens
 }
