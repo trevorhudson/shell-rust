@@ -151,7 +151,7 @@ pub fn run_line(
         }
         Command::Complete(CompleteOp::Print { cmd }) => {
             if let Some(c) = completions.get(&cmd) {
-                println!("complete -C '{}' {cmd}", c.to_string_lossy().to_string())
+                println!("complete -C '{}' {cmd}", c.to_string_lossy())
             } else {
                 eprintln!("complete: {cmd}: no completion specification")
             }

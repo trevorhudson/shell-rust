@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
 use rustyline::Context;
 use rustyline::completion::{Completer, FilenameCompleter, Pair, extract_word};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
@@ -7,6 +10,7 @@ use crate::BUILTINS;
 #[derive(Helper, Hinter, Highlighter, Validator)]
 pub struct ShellHelper {
     executables: Vec<String>,
+    completions: HashMap<String, PathBuf>,
     files: FilenameCompleter,
 }
 
@@ -14,8 +18,13 @@ impl ShellHelper {
     pub fn new(executables: Vec<String>) -> Self {
         ShellHelper {
             executables,
+            completions: HashMap::new(),
             files: FilenameCompleter::new(),
         }
+    }
+
+    pub fn completions_mut(&mut self) -> &mut HashMap<String, PathBuf> {
+        &mut self.completions
     }
 
     fn complete_command(&self, prefix: &str) -> Vec<Pair> {
@@ -37,6 +46,19 @@ impl ShellHelper {
     }
 }
 
+fn run_completer(script: &Path) -> Vec<Pair> {
+    let Ok(output) = std::process::Command::new(script).output() else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|l| Pair {
+            display: l.to_string(),
+            replacement: l.to_string(),
+        })
+        .collect()
+}
+
 impl Completer for ShellHelper {
     type Candidate = Pair;
 
@@ -48,7 +70,13 @@ impl Completer for ShellHelper {
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let (word_start, word) = extract_word(line, pos, Some('\\'), char::is_whitespace);
 
-        let (start, mut candidates) = if word_start == 0 {
+        let command = line.split_whitespace().next();
+
+        let (start, mut candidates) = if word_start != 0
+            && let Some(script) = command.and_then(|c| self.completions.get(c))
+        {
+            (word_start, run_completer(script))
+        } else if word_start == 0 {
             (0, self.complete_command(word))
         } else {
             self.files.complete(line, pos, ctx)?
