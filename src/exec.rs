@@ -106,7 +106,7 @@ fn expand_tilde(token: String) -> String {
 
 pub fn run_line(
     line: &str,
-    completions: &mut HashMap<String, String>,
+    completions: &mut HashMap<String, PathBuf>,
 ) -> io::Result<ControlFlow<()>> {
     let Some(parsed) = ParsedLine::parse(line) else {
         return Ok(ControlFlow::Continue(()));
@@ -151,7 +151,7 @@ pub fn run_line(
         }
         Command::Complete(CompleteOp::Print { cmd }) => {
             if let Some(c) = completions.get(&cmd) {
-                println!("complete -C '{c}' {cmd}")
+                println!("complete -C '{}' {cmd}", c.to_string_lossy().to_string())
             } else {
                 eprintln!("complete: {cmd}: no completion specification")
             }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::ControlFlow;
+use std::path::PathBuf;
 
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Editor};
@@ -20,7 +21,7 @@ fn main() -> anyhow::Result<()> {
 
     editor.set_helper(Some(ShellHelper::new(exec::collect_executables())));
 
-    let mut completions: HashMap<String, String> = HashMap::new();
+    let mut completions: HashMap<String, PathBuf> = HashMap::new();
 
     loop {
         let line = match editor.readline("$ ") {
