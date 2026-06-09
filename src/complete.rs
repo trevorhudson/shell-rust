@@ -46,8 +46,13 @@ impl ShellHelper {
     }
 }
 
-fn run_completer(script: &Path, args: Vec<&str>) -> Vec<Pair> {
-    let Ok(output) = std::process::Command::new(script).args(args).output() else {
+fn run_completer(script: &Path, args: Vec<&str>, line: &str, pos: usize) -> Vec<Pair> {
+    let Ok(output) = std::process::Command::new(script)
+        .args(args)
+        .env("COMP_LINE", line)
+        .env("COMP_POINT", pos.to_string())
+        .output()
+    else {
         return Vec::new();
     };
     String::from_utf8_lossy(&output.stdout)
@@ -80,7 +85,7 @@ impl Completer for ShellHelper {
                 .unwrap_or(command);
             (
                 word_start,
-                run_completer(script, vec![command, word, preceding]),
+                run_completer(script, vec![command, word, preceding], line, pos),
             )
         } else if word_start == 0 {
             (0, self.complete_command(word))
