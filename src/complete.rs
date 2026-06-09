@@ -69,15 +69,26 @@ impl Completer for ShellHelper {
         ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let (word_start, word) = extract_word(line, pos, Some('\\'), char::is_whitespace);
+        println!("\n\t->: ({line}), ({pos}), ({word}), ({word_start})");
 
         let command = line.split_whitespace().next();
 
+        let (prev_word_start, word) =
+            extract_word(line, word_start - 1, Some('\\'), char::is_whitespace);
+
+        println!("\n\t\t -> -> {prev_word_start}, {word}");
+
+        // argv[v1] = Command
+        // argv[2] = word being completed
+        // argv[3] = previous word
+
         let (start, mut candidates) = if word_start != 0
-            && let Some(script) = command.and_then(|c| self.completions.get(c))
+            && let (Some(script), cmd) =
+                { (command.and_then(|c| self.completions.get(c)), "argv[1]") }
         {
             (
                 word_start,
-                run_completer(script, vec!["git", "ad", "remote"]),
+                run_completer(script, vec![cmd, word, "argv[3]"]),
             )
         } else if word_start == 0 {
             (0, self.complete_command(word))
