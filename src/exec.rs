@@ -149,6 +149,9 @@ pub fn run_line(
         Command::Complete(CompleteOp::Register { cmd, path }) => {
             completions.insert(cmd, path);
         }
+        Command::Complete(CompleteOp::Unregister { cmd }) => {
+            completions.remove(&cmd);
+        }
         Command::Complete(CompleteOp::Print { cmd }) => {
             if let Some(c) = completions.get(&cmd) {
                 println!("complete -C '{}' {cmd}", c.to_string_lossy())

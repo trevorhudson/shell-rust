@@ -135,6 +135,7 @@ pub struct Redirect {
 pub enum CompleteOp {
     Register { cmd: String, path: PathBuf }, // -C
     Print { cmd: String },                   // -p
+    Unregister { cmd: String },
 }
 
 pub enum Command {
@@ -170,6 +171,7 @@ impl Command {
                     let cmd = parts.next()?;
                     Command::Complete(CompleteOp::Register { cmd, path })
                 }
+                "-r" => Command::Complete(CompleteOp::Unregister { cmd: parts.next()? }),
                 "-p" => Command::Complete(CompleteOp::Print { cmd: parts.next()? }),
                 _ => return None,
             },
