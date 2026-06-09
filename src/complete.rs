@@ -46,11 +46,19 @@ impl ShellHelper {
     }
 }
 
-fn run_completer(script: &Path, args: Vec<&str>, line: &str, pos: usize) -> Vec<Pair> {
+struct CompCtx<'a> {
+    command: &'a str,
+    word: &'a str,
+    preceding: &'a str,
+    line: &'a str,
+    pos: usize,
+}
+
+fn run_completer(script: &Path, ctx: &CompCtx) -> Vec<Pair> {
     let Ok(output) = std::process::Command::new(script)
-        .args(args)
-        .env("COMP_LINE", line)
-        .env("COMP_POINT", pos.to_string())
+        .args([ctx.command, ctx.word, ctx.preceding]) // fixed [_; 3], no Vec
+        .env("COMP_LINE", ctx.line)
+        .env("COMP_POINT", ctx.pos.to_string())
         .output()
     else {
         return Vec::new();
@@ -85,7 +93,16 @@ impl Completer for ShellHelper {
                 .unwrap_or(command);
             (
                 word_start,
-                run_completer(script, vec![command, word, preceding], line, pos),
+                run_completer(
+                    script,
+                    &CompCtx {
+                        command,
+                        word,
+                        preceding,
+                        line,
+                        pos,
+                    },
+                ),
             )
         } else if word_start == 0 {
             (0, self.complete_command(word))
