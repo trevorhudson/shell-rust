@@ -46,8 +46,8 @@ impl ShellHelper {
     }
 }
 
-fn run_completer(script: &Path) -> Vec<Pair> {
-    let Ok(output) = std::process::Command::new(script).output() else {
+fn run_completer(script: &Path, args: Vec<&str>) -> Vec<Pair> {
+    let Ok(output) = std::process::Command::new(script).args(args).output() else {
         return Vec::new();
     };
     String::from_utf8_lossy(&output.stdout)
@@ -75,7 +75,10 @@ impl Completer for ShellHelper {
         let (start, mut candidates) = if word_start != 0
             && let Some(script) = command.and_then(|c| self.completions.get(c))
         {
-            (word_start, run_completer(script))
+            (
+                word_start,
+                run_completer(script, vec!["git", "ad", "remote"]),
+            )
         } else if word_start == 0 {
             (0, self.complete_command(word))
         } else {
