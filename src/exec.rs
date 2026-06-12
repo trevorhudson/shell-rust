@@ -11,12 +11,6 @@ use crate::BUILTINS;
 use crate::parse::{Command, CompleteOp, Fd, Mode, ParsedLine, Redirect};
 
 #[derive(Debug)]
-enum Running {
-    True,
-    False,
-}
-
-#[derive(Debug)]
 pub struct Job {
     id: usize,
     command: String,
@@ -174,7 +168,7 @@ pub fn run_line(
         }
         Command::Jobs => {
             let last = jobs.len().saturating_sub(1);
-            for (i, j) in jobs.iter().enumerate() {
+            for (i, j) in jobs.iter_mut().enumerate() {
                 let marker = if i == last {
                     "+" // Current (most recent) job
                 } else if i + 1 == last {
@@ -183,8 +177,17 @@ pub fn run_line(
                     " "
                 };
 
-                println!("[{}]{}  {:<24}{}", j.id, marker, "Running", j.command);
+                let status = match j.child.try_wait() {
+                    Ok(Some(_)) => "Done", // exited
+                    Ok(None) => "Running", // still alive
+                    Err(_) => "Running",   // couldn't check; treat as running
+                };
+
+                println!("[{}]{}  {:<24}{}", j.id, marker, status, j.command);
             }
+
+            // Remove completed jobs
+            jobs.retain_mut(|j| matches!(j.child.try_wait(), Ok(None)));
         }
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
