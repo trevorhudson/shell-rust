@@ -9,6 +9,7 @@ enum QuoteState {
 }
 
 enum Token {
+    Background,
     Word(String),
     Redirect { fd: Fd, mode: Mode },
 }
@@ -40,6 +41,7 @@ fn classify(text: String, quoted: bool) -> Token {
                     mode: Mode::Append,
                 };
             }
+            "&" => return Token::Background,
             _ => {}
         }
     }
@@ -187,6 +189,7 @@ impl Command {
 
 pub struct ParsedLine {
     pub command: Command,
+    pub background: bool,
     pub stderr: Option<Redirect>,
     pub stdout: Option<Redirect>,
 }
@@ -195,11 +198,13 @@ impl ParsedLine {
     pub fn parse(input: &str) -> Option<Self> {
         let mut stdout: Option<Redirect> = None;
         let mut stderr: Option<Redirect> = None;
+        let mut background: bool = false;
         let mut words: Vec<String> = Vec::new();
 
         let mut tokens = tokenize(input.trim()).into_iter();
         while let Some(token) = tokens.next() {
             match token {
+                Token::Background => background = true,
                 Token::Word(w) => words.push(w),
                 Token::Redirect { fd, mode } => {
                     // target is the next token, and it must be a word
@@ -220,6 +225,7 @@ impl ParsedLine {
 
         let command = Command::from_tokens(words)?;
         Some(ParsedLine {
+            background,
             command,
             stderr,
             stdout,
