@@ -10,5 +10,6 @@ target/
 *.pdb
 
 notes.md
+tasks/
 
 .claude/
