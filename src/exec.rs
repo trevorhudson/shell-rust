@@ -174,7 +174,7 @@ pub fn run_line(
         }
         Command::Jobs => {
             for j in jobs {
-                println!("[{}]+  Running                 {}", j.id, j.command);
+                println!("[{}]+  {:<24}{}", j.id, "Running", j.command);
             }
         }
         Command::External { name, args } => match locate_executable(&name) {
