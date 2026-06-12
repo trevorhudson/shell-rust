@@ -16,6 +16,7 @@ fn main() -> anyhow::Result<()> {
         .completion_type(CompletionType::List)
         .build();
     let mut editor = Editor::<ShellHelper, _>::with_config(config)?;
+    let mut jobs: Vec<exec::Job> = Vec::new();
 
     editor.set_helper(Some(ShellHelper::new(exec::collect_executables())));
 
@@ -28,7 +29,7 @@ fn main() -> anyhow::Result<()> {
         };
 
         let action = match editor.helper_mut() {
-            Some(helper) => exec::run_line(&line, helper.completions_mut()),
+            Some(helper) => exec::run_line(&line, helper.completions_mut(), &mut jobs),
             None => Ok(ControlFlow::Continue(())),
         };
 

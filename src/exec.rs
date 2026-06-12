@@ -10,6 +10,19 @@ use std::{
 use crate::BUILTINS;
 use crate::parse::{Command, CompleteOp, Fd, Mode, ParsedLine, Redirect};
 
+#[derive(Debug)]
+enum Running {
+    True,
+    False,
+}
+
+#[derive(Debug)]
+pub struct Job {
+    id: usize,
+    command: String,
+    child: std::process::Child,
+}
+
 /// Write to a file, or print
 fn write_to(content: &str, redirect: Option<&Redirect>, default: Fd) -> io::Result<()> {
     match redirect {
@@ -107,11 +120,11 @@ fn expand_tilde(token: String) -> String {
 pub fn run_line(
     line: &str,
     completions: &mut HashMap<String, PathBuf>,
+    jobs: &mut Vec<Job>,
 ) -> io::Result<ControlFlow<()>> {
     let Some(parsed) = ParsedLine::parse(line) else {
         return Ok(ControlFlow::Continue(()));
     };
-
     // Pre-open/create the file to match bash behavior. May need to refactor later.
     if let Some(redirect) = &parsed.stdout {
         open_for(redirect)?;
@@ -159,7 +172,11 @@ pub fn run_line(
                 eprintln!("complete: {cmd}: no completion specification")
             }
         }
-        Command::Jobs => {}
+        Command::Jobs => {
+            for j in jobs {
+                println!("[{}]+  Running                 {}", j.id, j.command);
+            }
+        }
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
                 let mut cmd = std::process::Command::new(path);
@@ -173,7 +190,13 @@ pub fn run_line(
 
                 if parsed.background {
                     let child = cmd.spawn()?;
-                    println!("[1] {}", child.id());
+                    let id = jobs.len() + 1;
+                    println!("[{}] {}", id, child.id());
+                    jobs.push(Job {
+                        id,
+                        command: line.trim().to_string(),
+                        child,
+                    });
                 } else {
                     cmd.status()?;
                 }
