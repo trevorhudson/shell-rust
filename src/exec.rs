@@ -159,6 +159,7 @@ pub fn run_line(
                 eprintln!("complete: {cmd}: no completion specification")
             }
         }
+        Command::Jobs => {}
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
                 let mut cmd = std::process::Command::new(path);

@@ -145,6 +145,7 @@ pub enum Command {
     External { args: Vec<String>, name: String },
     Pwd,
     Type { target: String },
+    Jobs,
     Complete(CompleteOp),
 }
 
@@ -175,6 +176,7 @@ impl Command {
                 "-p" => Command::Complete(CompleteOp::Print { cmd: parts.next()? }),
                 _ => return None,
             },
+            "jobs" => Command::Jobs,
             _ => Command::External {
                 name: cmd,
                 args: parts.collect(),
