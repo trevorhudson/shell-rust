@@ -9,7 +9,7 @@ mod parse;
 
 use complete::ShellHelper;
 
-const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd", "complete"];
+const BUILTINS: &[&str] = &["echo", "exit", "type", "pwd", "cd", "complete", "jobs"];
 
 fn main() -> anyhow::Result<()> {
     let config = Config::builder()
