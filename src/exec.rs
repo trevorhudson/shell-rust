@@ -173,8 +173,17 @@ pub fn run_line(
             }
         }
         Command::Jobs => {
-            for j in jobs {
-                println!("[{}]+  {:<24}{}", j.id, "Running", j.command);
+            let last = jobs.len().saturating_sub(1);
+            for (i, j) in jobs.iter().enumerate() {
+                let marker = if i == last {
+                    "+" // Current (most recent) job
+                } else if i + 1 == last {
+                    "-" // Previous job
+                } else {
+                    " "
+                };
+
+                println!("[{}]{}  {:<24}{}", j.id, marker, "Running", j.command);
             }
         }
         Command::External { name, args } => match locate_executable(&name) {
