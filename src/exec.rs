@@ -170,7 +170,13 @@ pub fn run_line(
                 if let Some(redirect) = &parsed.stderr {
                     cmd.stderr(open_for(redirect)?);
                 }
-                cmd.status()?;
+
+                if parsed.background {
+                    let child = cmd.spawn()?;
+                    println!("[1] {}", child.id());
+                } else {
+                    cmd.status()?;
+                }
             }
             None => eprintln!("{}: command not found", name),
         },
