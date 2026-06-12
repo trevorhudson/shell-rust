@@ -183,7 +183,12 @@ pub fn run_line(
                     Err(_) => "Running",   // couldn't check; treat as running
                 };
 
-                println!("[{}]{}  {:<24}{}", j.id, marker, status, j.command);
+                let command = match status {
+                    "Done" => j.command.trim_end_matches(['&', ' ']),
+                    _ => &j.command,
+                };
+
+                println!("[{}]{}  {:<24}{}", j.id, marker, status, command);
             }
 
             // Remove completed jobs
