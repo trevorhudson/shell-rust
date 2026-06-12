@@ -21,6 +21,10 @@ fn main() -> anyhow::Result<()> {
     editor.set_helper(Some(ShellHelper::new(exec::collect_executables())));
 
     loop {
+        // Reap finished background jobs before drawing the prompt, so their
+        // `Done` lines land between the last command's output and the prompt.
+        exec::report_and_reap(&mut jobs, false);
+
         let line = match editor.readline("$ ") {
             Ok(line) => line,
             Err(ReadlineError::Eof) => break,

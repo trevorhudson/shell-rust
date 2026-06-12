@@ -166,34 +166,7 @@ pub fn run_line(
                 eprintln!("complete: {cmd}: no completion specification")
             }
         }
-        Command::Jobs => {
-            let last = jobs.len().saturating_sub(1);
-            for (i, j) in jobs.iter_mut().enumerate() {
-                let marker = if i == last {
-                    "+" // Current (most recent) job
-                } else if i + 1 == last {
-                    "-" // Previous job
-                } else {
-                    " "
-                };
-
-                let status = match j.child.try_wait() {
-                    Ok(Some(_)) => "Done", // exited
-                    Ok(None) => "Running", // still alive
-                    Err(_) => "Running",   // couldn't check; treat as running
-                };
-
-                let command = match status {
-                    "Done" => j.command.trim_end_matches(['&', ' ']),
-                    _ => &j.command,
-                };
-
-                println!("[{}]{}  {:<24}{}", j.id, marker, status, command);
-            }
-
-            // Remove completed jobs
-            jobs.retain_mut(|j| matches!(j.child.try_wait(), Ok(None)));
-        }
+        Command::Jobs => report_and_reap(jobs, true),
         Command::External { name, args } => match locate_executable(&name) {
             Some(path) => {
                 let mut cmd = std::process::Command::new(path);
@@ -222,4 +195,46 @@ pub fn run_line(
         },
     }
     Ok(ControlFlow::Continue(()))
+}
+
+/// Job-control marker: `+` for the current (most recent) job, `-` for the
+/// previous one, a space otherwise.
+fn job_marker(i: usize, last: usize) -> &'static str {
+    if i == last {
+        "+"
+    } else if i + 1 == last {
+        "-"
+    } else {
+        " "
+    }
+}
+
+/// Walk the job table in order, print each reported line, and drop the
+/// finished jobs. With `include_running`, every job is listed (the `jobs`
+/// builtin); otherwise only `Done` jobs are shown (automatic reaping before
+/// the prompt). Either way a finished job is reported exactly once, then
+/// removed, and markers are computed against the full table.
+pub fn report_and_reap(jobs: &mut Vec<Job>, include_running: bool) {
+    let last = jobs.len().saturating_sub(1);
+    let mut i = 0;
+    jobs.retain_mut(|job| {
+        let done = matches!(job.child.try_wait(), Ok(Some(_)));
+        if done || include_running {
+            // Done lines drop the trailing `&` like bash does; Running keep it.
+            let (status, command) = match done {
+                true => ("Done", job.command.trim_end_matches(['&', ' '])),
+                false => ("Running", job.command.as_str()),
+            };
+
+            println!(
+                "[{}]{}  {:<24}{}",
+                job.id,
+                job_marker(i, last),
+                status,
+                command
+            );
+        }
+        i += 1;
+        !done
+    });
 }
